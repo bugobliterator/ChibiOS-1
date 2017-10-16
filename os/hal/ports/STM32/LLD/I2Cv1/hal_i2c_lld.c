@@ -208,6 +208,43 @@ static void i2c_lld_set_clock(I2CDriver *i2cp) {
 }
 
 /**
+ * @brief   Set filter params.
+ *
+ * @param[in] i2cp      pointer to the @p I2CDriver object
+ *
+ * @notapi
+ */
+static void i2c_lld_set_filter(I2CDriver *i2cp) {
+  I2C_TypeDef *dp = i2cp->i2c;
+  i2cdutycycle_t duty = i2cp->config->duty_cycle;
+  uint8_t filter;
+
+  if (duty == STD_DUTY_CYCLE) {
+    if (I2C_CLK_FREQ <= 5) {
+      filter = 2;
+    } else if (I2C_CLK_FREQ <= 10) {
+      filter = 12;
+    } else {
+      filter = 15;
+    }
+  } else {
+    if (I2C_CLK_FREQ <= 10) {
+      filter = 0;
+    } else if (I2C_CLK_FREQ <= 20) {
+      filter = 1;
+    } else if (I2C_CLK_FREQ <= 30) {
+      filter = 7;
+    } else if (I2C_CLK_FREQ <= 40) {
+      filter = 13;
+    } else {
+      filter = 15;
+    }
+  }
+
+  dp->FLTR = (I2C_FLTR_ANOFF) | (I2C_FLTR_DNF & filter);
+}
+
+/**
  * @brief   Set operation mode of I2C hardware.
  *
  * @param[in] i2cp      pointer to the @p I2CDriver object
@@ -252,7 +289,7 @@ static void i2c_lld_serve_event_interrupt(I2CDriver *i2cp) {
      done by the DMA.*/
   switch (I2C_EV_MASK & (event | (regSR2 << 16))) {
   case I2C_EV5_MASTER_MODE_SELECT:
-    if ((i2cp->addr >> 8) > 0) { 
+    if ((i2cp->addr >> 8) > 0) {
       /* 10-bit address: 1 1 1 1 0 X X R/W */
       dp->DR = 0xF0 | (0x6 & (i2cp->addr >> 8)) | (0x1 & i2cp->addr);
     } else {
@@ -287,6 +324,13 @@ static void i2c_lld_serve_event_interrupt(I2CDriver *i2cp) {
     _i2c_wakeup_isr(i2cp);
     break;
   default:
+    event = dp->SR1;
+    if (event & I2C_SR1_TXE)
+      dp->DR =0;
+    if (event & I2C_SR1_BTF)
+      (void)dp->DR;
+    if (event & I2C_SR1_STOPF)
+      dp->CR1 = dp->CR1;
     break;
   }
   /* Clear ADDR flag. */
@@ -639,6 +683,7 @@ void i2c_lld_start(I2CDriver *i2cp) {
 
   /* Setup I2C parameters.*/
   i2c_lld_set_clock(i2cp);
+  i2c_lld_set_filter(i2cp);
   i2c_lld_set_opmode(i2cp);
 
   /* Ready to go.*/
@@ -715,7 +760,6 @@ msg_t i2c_lld_master_receive_timeout(I2CDriver *i2cp, i2caddr_t addr,
                                      uint8_t *rxbuf, size_t rxbytes,
                                      sysinterval_t timeout) {
   I2C_TypeDef *dp = i2cp->i2c;
-  systime_t start, end;
 
 #if defined(STM32F1XX_I2C)
   osalDbgCheck(rxbytes > 1);
@@ -735,27 +779,13 @@ msg_t i2c_lld_master_receive_timeout(I2CDriver *i2cp, i2caddr_t addr,
   dmaStreamSetMemory0(i2cp->dmarx, rxbuf);
   dmaStreamSetTransactionSize(i2cp->dmarx, rxbytes);
 
-  /* Calculating the time window for the timeout on the busy bus condition.*/
-  start = osalOsGetSystemTimeX();
-  end = osalTimeAddX(start, OSAL_MS2I(STM32_I2C_BUSY_TIMEOUT));
+  osalSysLock();
 
-  /* Waits until BUSY flag is reset or, alternatively, for a timeout
-     condition.*/
-  while (true) {
-    osalSysLock();
-
-    /* If the bus is not busy then the operation can continue, note, the
-       loop is exited in the locked state.*/
-    if (!(dp->SR2 & I2C_SR2_BUSY) && !(dp->CR1 & I2C_CR1_STOP))
-      break;
-
-    /* If the system time went outside the allowed window then a timeout
-       condition is returned.*/
-    if (!osalTimeIsInRangeX(osalOsGetSystemTimeX(), start, end))
-      return MSG_TIMEOUT;
-
-    osalSysUnlock();
-  }
+  /* we expect the bus to not be busy when this is called. If it is
+   * busy then immediately fail and let higher level code restart
+   * I2C. Note that we return with lock held. */
+  if (!(dp->SR2 & I2C_SR2_BUSY) && !(dp->CR1 & I2C_CR1_STOP))
+    return MSG_TIMEOUT;
 
   /* Starts the operation.*/
   dp->CR2 |= I2C_CR2_ITEVTEN;
@@ -820,27 +850,13 @@ msg_t i2c_lld_master_transmit_timeout(I2CDriver *i2cp, i2caddr_t addr,
   dmaStreamSetMemory0(i2cp->dmarx, rxbuf);
   dmaStreamSetTransactionSize(i2cp->dmarx, rxbytes);
 
-  /* Calculating the time window for the timeout on the busy bus condition.*/
-  start = osalOsGetSystemTimeX();
-  end = osalTimeAddX(start, OSAL_MS2I(STM32_I2C_BUSY_TIMEOUT));
+  osalSysLock();
 
-  /* Waits until BUSY flag is reset or, alternatively, for a timeout
-     condition.*/
-  while (true) {
-    osalSysLock();
-
-    /* If the bus is not busy then the operation can continue, note, the
-       loop is exited in the locked state.*/
-    if (!(dp->SR2 & I2C_SR2_BUSY) && !(dp->CR1 & I2C_CR1_STOP))
-      break;
-
-    /* If the system time went outside the allowed window then a timeout
-       condition is returned.*/
-    if (!osalTimeIsInRangeX(osalOsGetSystemTimeX(), start, end))
-      return MSG_TIMEOUT;
-
-    osalSysUnlock();
-  }
+  /* we expect the bus to not be busy when this is called. If it is
+   * busy then immediately fail and let higher level code restart
+   * I2C. Note that we return with lock held. */
+  if (!(dp->SR2 & I2C_SR2_BUSY) && !(dp->CR1 & I2C_CR1_STOP))
+    return MSG_TIMEOUT;
 
   /* Starts the operation.*/
   dp->CR2 |= I2C_CR2_ITEVTEN;
