@@ -48,6 +48,7 @@
  * @name    Configuration options
  * @{
  */
+#define STM32_I2C_NUM_IRQ_PER_TRX 50
 /**
  * @brief   I2C1 driver enable switch.
  * @details If set to @p TRUE the support for I2C1 is included.
@@ -464,6 +465,10 @@ struct I2CDriver {
    * @brief     Transmit DMA channel.
    */
   const stm32_dma_stream_t  *dmatx;
+
+  uint16_t                   num_irq_trx;
+
+  uint16_t                   max_num_irq_trx;
 #else
   /**
    * @brief     Receive buffer.
