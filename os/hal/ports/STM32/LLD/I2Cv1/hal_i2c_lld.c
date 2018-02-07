@@ -825,7 +825,6 @@ msg_t i2c_lld_master_transmit_timeout(I2CDriver *i2cp, i2caddr_t addr,
                                       uint8_t *rxbuf, size_t rxbytes,
                                       sysinterval_t timeout) {
   I2C_TypeDef *dp = i2cp->i2c;
-  systime_t start, end;
 
 #if defined(STM32F1XX_I2C)
   osalDbgCheck((rxbytes == 0) || ((rxbytes > 1) && (rxbuf != NULL)));
