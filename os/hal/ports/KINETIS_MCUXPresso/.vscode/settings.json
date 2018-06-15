@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "fsl_port.h": "c"
+    }
+}
