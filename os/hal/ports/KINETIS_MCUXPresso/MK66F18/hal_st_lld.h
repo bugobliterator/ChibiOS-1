@@ -33,7 +33,7 @@
 /*===========================================================================*/
 /* Driver constants.                                                         */
 /*===========================================================================*/
-#define PORT_TIMER_TYPE_SINGLE_SHOT
+//#define PORT_TIMER_TYPE_SINGLE_SHOT
 /*===========================================================================*/
 /* Driver pre-compile time settings.                                         */
 /*===========================================================================*/
@@ -48,36 +48,104 @@
 #if !defined(KINETIS_ST_IRQ_PRIORITY) || defined(__DOXYGEN__)
 #define KINETIS_ST_IRQ_PRIORITY               8
 #endif
-
-/**
- * @brief   TIMx unit (by number) to be used for free running operations.
- * @note    You must select a 32 bits timer if a 32 bits @p systick_t type
- *          is required.
- * @note    Timers 2, 3, 4 and 5 are supported.
- */
-#if !defined(KINETIS_ST_USE_PIT_CH) || defined(__DOXYGEN__)
-#define KINETIS_ST_USE_PIT_CH                  3
-#endif
 /** @} */
 
 /*===========================================================================*/
 /* Derived constants and error checks.                                       */
 /*===========================================================================*/
-
-#if KINETIS_ST_USE_PIT_CH == 0
-#define ST_HANDLER    KINETIS_PIT0_IRQ_VECTOR
-#define ST_VECTOR_NUM PIT0_IRQn
-#elif KINETIS_ST_USE_PIT_CH == 1
-#define ST_HANDLER    KINETIS_PIT1_IRQ_VECTOR
-#define ST_VECTOR_NUM PIT1_IRQn
-#elif KINETIS_ST_USE_PIT_CH == 3
 #define ST_HANDLER    KINETIS_PIT3_IRQ_VECTOR
 #define ST_VECTOR_NUM PIT3_IRQn
-#else
-#error "KINETIS_ST_USE_PIT_CH specifies an unsupported PIT Channel"
-#endif
-
 /** @} */
+
+/*===========================================================================*/
+/* Driver inline functions.                                                  */
+/*===========================================================================*/
+
+/**
+ * @brief   Returns the time counter value.
+ *
+ * @return              The counter value.
+ *
+ * @notapi
+ */
+inline static systime_t st_lld_get_counter(void) {
+  return ~(PIT_GetCurrentTimerCount(PIT, kPIT_Chnl_1));
+}
+
+/**
+ * @brief   Starts the alarm.
+ * @note    Makes sure that no spurious alarms are triggered after
+ *          this call.
+ *
+ * @param[in] time      the time to be set for the first alarm
+ *
+ * @notapi
+ */
+inline static  void st_lld_start_alarm(systime_t time) {
+    /* We get here absolute interrupt time which takes into account counter overflow.
+    * Since we use additional count-down timer to generate interrupt we need to calculate
+    * load value based on time-stamp.
+    */
+  const uint32_t now_ticks = st_lld_get_counter();
+  uint32_t delta_ticks =
+    time >= now_ticks ? time - now_ticks : (uint32_t)((uint64_t) time + 0xFFFFFFFF - now_ticks);
+
+  if (delta_ticks < CH_CFG_ST_TIMEDELTA) {
+    /* The requested delay is less than the minimum resolution of this counter. */
+    delta_ticks = CH_CFG_ST_TIMEDELTA;
+  }
+
+  PIT_StopTimer(PIT, kPIT_Chnl_3);
+  PIT_StopTimer(PIT, kPIT_Chnl_2);
+  PIT_SetTimerPeriod(PIT, kPIT_Chnl_3, delta_ticks - 1);
+  PIT_EnableInterrupts(PIT, kPIT_Chnl_3, kPIT_TimerInterruptEnable);
+  PIT_StartTimer(PIT, kPIT_Chnl_3);
+  PIT_StartTimer(PIT, kPIT_Chnl_2);
+}
+
+/**
+ * @brief   Stops the alarm interrupt.
+ *
+ * @notapi
+ */
+inline static  void st_lld_stop_alarm(void) {
+  PIT_DisableInterrupts(PIT, kPIT_Chnl_3, kPIT_TimerInterruptEnable);
+}
+
+/**
+ * @brief   Sets the alarm time.
+ *
+ * @param[in] time      the time to be set for the next alarm
+ *
+ * @notapi
+ */
+inline static  void st_lld_set_alarm(systime_t time) {
+  st_lld_start_alarm(time);
+}
+
+/**
+ * @brief   Returns the current alarm time.
+ *
+ * @return              The currently set alarm time.
+ *
+ * @notapi
+ */
+inline static  systime_t st_lld_get_alarm(void) {
+  return PIT->CHANNEL[kPIT_Chnl_3].LDVAL;
+}
+
+/**
+ * @brief   Determines if the alarm is active.
+ *
+ * @return              The alarm status.
+ * @retval false        if the alarm is not active.
+ * @retval true         is the alarm is active
+ *
+ * @notapi
+ */
+inline static  bool st_lld_is_alarm_active(void) {
+  return PIT_GetEnabledInterrupts(PIT, kPIT_Chnl_3) & kPIT_TimerInterruptEnable;
+}
 
 /*===========================================================================*/
 /* Driver data structures and types.                                         */
@@ -94,12 +162,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  systime_t st_lld_get_counter(void);
-  void st_lld_start_alarm(systime_t time);
-  void st_lld_stop_alarm(void);
-  void st_lld_set_alarm(systime_t time);
-  systime_t st_lld_get_alarm(void);
-  bool st_lld_is_alarm_active(void);
   void st_lld_init(void);
 #ifdef __cplusplus
 }

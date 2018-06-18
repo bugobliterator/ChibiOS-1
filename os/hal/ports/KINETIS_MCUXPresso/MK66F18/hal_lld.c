@@ -23,7 +23,7 @@
  */
 
 #include "hal.h"
-
+#include "fsl_edma.h"
 /*===========================================================================*/
 /* Driver exported functions.                                                */
 /*===========================================================================*/
@@ -35,7 +35,7 @@ edma_config_t global_edma_config;
  * @notapi
  */
 void hal_lld_init(void) {
-    dmaInit();
+    //dmaInit();
 }
 
 void kinetis_clock_init(void) {

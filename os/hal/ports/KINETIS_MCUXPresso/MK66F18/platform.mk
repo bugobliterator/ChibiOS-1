@@ -11,7 +11,8 @@ PLATFORMSRC = ${CHIBIOS}/os/hal/ports/common/ARMCMx/nvic.c \
               ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_pit.c \
               ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_tpm.c \
               ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_lpuart.c \
-              ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_uart.c
+              ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_uart.c \
+              ${CHIBIOS}/os/hal/ports/KINETIS_MCUXPresso/MK66F18/SDK/drivers/fsl_edma.c
 
 
 # Required include directories
