@@ -29,13 +29,70 @@
 
 #if HAL_USE_PAL || defined(__DOXYGEN__)
 
-#define PAL_MODE_ALTERNATIVE_1      0x10
-#define PAL_MODE_ALTERNATIVE_2      0x11
-#define PAL_MODE_ALTERNATIVE_3      0x12
-#define PAL_MODE_ALTERNATIVE_4      0x13
-#define PAL_MODE_ALTERNATIVE_5      0x14
-#define PAL_MODE_ALTERNATIVE_6      0x15
-#define PAL_MODE_ALTERNATIVE_7      0x16
+
+/*===========================================================================*/
+/* Driver constants.                                                         */
+/*===========================================================================*/
+
+/**
+ * @name    Pads mode constants
+ * @{
+ */
+/**
+ * @brief   After reset state.
+ * @details The state itself is not specified and is architecture dependent,
+ *          it is guaranteed to be equal to the after-reset state. It is
+ *          usually an input state.
+ */
+#define PAL_MODE_RESET_MASK                  0U
+
+/**
+ * @brief   Safe state for <b>unconnected</b> pads.
+ * @details The state itself is not specified and is architecture dependent,
+ *          it may be mapped on @p PAL_MODE_INPUT_PULLUP,
+ *          @p PAL_MODE_INPUT_PULLDOWN or @p PAL_MODE_OUTPUT_PUSHPULL for
+ *          example.
+ */
+#define PAL_MODE_UNCONNECTED_MASK            (1U<<PAL_MODE_UNCONNECTED)
+
+/**
+ * @brief   Regular input high-Z pad.
+ */
+#define PAL_MODE_INPUT_MASK                  (1U<<PAL_MODE_INPUT)
+
+/**
+ * @brief   Input pad with weak pull up resistor.
+ */
+#define PAL_MODE_INPUT_PULLUP_MASK           (1U<<PAL_MODE_INPUT_PULLUP)
+
+/**
+ * @brief   Input pad with weak pull down resistor.
+ */
+#define PAL_MODE_INPUT_PULLDOWN_MASK         (1U<<PAL_MODE_INPUT_PULLDOWN)
+
+/**
+ * @brief   Analog input mode.
+ */
+#define PAL_MODE_INPUT_ANALOG_MASK           (1U<<PAL_MODE_INPUT_ANALOG)
+
+/**
+ * @brief   Output pad.
+ */
+#define PAL_MODE_OUTPUT_MASK                 (1U<<PAL_MODE_OUTPUT_PUSHPULL)
+
+/**
+ * @brief   Open-drain output pad.
+ */
+#define PAL_MODE_OUTPUT_OPENDRAIN_MASK       (1U<<PAL_MODE_OUTPUT_OPENDRAIN)
+/** @} */
+#define PAL_MODE_ALTERNATIVE_MASK            (0x7F00U | PAL_MODE_INPUT_ANALOG_MASK | PAL_MODE_UNCONNECTED_MASK)
+#define PAL_MODE_ALTERNATIVE_1_MASK          (1U<<8U)
+#define PAL_MODE_ALTERNATIVE_2_MASK          (1U<<9U)
+#define PAL_MODE_ALTERNATIVE_3_MASK          (1U<<10U)
+#define PAL_MODE_ALTERNATIVE_4_MASK          (1U<<11U)
+#define PAL_MODE_ALTERNATIVE_5_MASK          (1U<<12U)
+#define PAL_MODE_ALTERNATIVE_6_MASK          (1U<<13U)
+#define PAL_MODE_ALTERNATIVE_7_MASK          (1U<<14U)
 
 /**
  * @brief   Width, in bits, of an I/O port.

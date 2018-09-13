@@ -107,7 +107,7 @@ void _pal_lld_setpadmode(ioportid_t port,
   gpio_pin_config_t gpio_pin_config;
   osalDbgAssert(pad < PAL_IOPORTS_WIDTH, "pal_lld_setpadmode() #1, invalid pad");
 
-  if (mode == PAL_MODE_OUTPUT_PUSHPULL) {
+  if (mode & PAL_MODE_OUTPUT_MASK) {
     gpio_pin_config.pinDirection = kGPIO_DigitalOutput;
     GPIO_PinInit(port, pad, (const gpio_pin_config_t*)&gpio_pin_config);
   } else { 
@@ -127,40 +127,42 @@ void _pal_lld_setpadmode(ioportid_t port,
 
   osalDbgAssert(portcfg != NULL, "pal_lld_setpadmode() #2, invalid port");
   port_pin_config.mux = 1;
-  switch (mode) {
 #if defined(FSL_FEATURE_PORT_HAS_OPEN_DRAIN) && FSL_FEATURE_PORT_HAS_OPEN_DRAIN
-  case PAL_MODE_OUTPUT_OPENDRAIN:
+  if (mode & PAL_MODE_OUTPUT_OPENDRAIN_MASK) {
     port_pin_config.openDrainEnable = kPORT_OpenDrainEnable;
-    break;
+  } else {
+    port_pin_config.openDrainEnable = kPORT_OpenDrainDisable;
+  }
 #endif
-  case PAL_MODE_INPUT_PULLUP:
-    port_pin_config.pullSelect = kPORT_PullUp;
-    break;
-  case PAL_MODE_INPUT_PULLDOWN:
-    port_pin_config.pullSelect = kPORT_PullDown;
-    break;
-  case PAL_MODE_UNCONNECTED:
-  case PAL_MODE_INPUT_ANALOG:
-    port_pin_config.mux = 0;
-    break;
-  case PAL_MODE_ALTERNATIVE_2:
-    port_pin_config.mux = 2;
-    break;
-  case PAL_MODE_ALTERNATIVE_3:
-    port_pin_config.mux = 3;
-    break;
-  case PAL_MODE_ALTERNATIVE_4:
-    port_pin_config.mux = 4;
-    break;
-  case PAL_MODE_ALTERNATIVE_5:
-    port_pin_config.mux = 5;
-    break;
-  case PAL_MODE_ALTERNATIVE_6:
-    port_pin_config.mux = 6;
-    break;
-  case PAL_MODE_ALTERNATIVE_7:
-    port_pin_config.mux = 7;
-    break;
+  if (PAL_MODE_INPUT_PULLUP_MASK & mode) {
+      port_pin_config.pullSelect = kPORT_PullUp;
+  } else {
+      port_pin_config.pullSelect = kPORT_PullDown;
+  }
+
+  switch(PAL_MODE_ALTERNATIVE_MASK & mode) {
+    case PAL_MODE_UNCONNECTED_MASK:
+    case PAL_MODE_INPUT_ANALOG_MASK:
+      port_pin_config.mux = 0;
+      break;
+    case PAL_MODE_ALTERNATIVE_2_MASK:
+      port_pin_config.mux = 2;
+      break;
+    case PAL_MODE_ALTERNATIVE_3_MASK:
+      port_pin_config.mux = 3;
+      break;
+    case PAL_MODE_ALTERNATIVE_4_MASK:
+      port_pin_config.mux = 4;
+      break;
+    case PAL_MODE_ALTERNATIVE_5_MASK:
+      port_pin_config.mux = 5;
+      break;
+    case PAL_MODE_ALTERNATIVE_6_MASK:
+      port_pin_config.mux = 6;
+      break;
+    case PAL_MODE_ALTERNATIVE_7_MASK:
+      port_pin_config.mux = 7;
+      break;
   }
   PORT_SetPinConfig(portcfg, pad, (const port_pin_config_t*)&port_pin_config);
 }

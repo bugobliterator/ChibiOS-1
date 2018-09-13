@@ -47,8 +47,8 @@ static THD_FUNCTION(Thread1, arg) {
     chRegSetThreadName("LEDBlinker");
     while (true) {
         palToggleLine(NXPHLITE_LED_R_LINE);
-        //palToggleLine(NXPHLITE_LED_G_LINE);
-        //palToggleLine(NXPHLITE_LED_B_LINE);
+        palToggleLine(NXPHLITE_LED_G_LINE);
+        palToggleLine(NXPHLITE_LED_B_LINE);
         chThdSleepMilliseconds(500);
     }
 }

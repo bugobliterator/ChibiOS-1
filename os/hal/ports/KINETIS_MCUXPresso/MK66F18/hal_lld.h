@@ -31,6 +31,7 @@
 
 #include "fsl_common.h"
 #include "nvic.h"
+#include "hal_edma.h"
 
 /**
  * @name    Platform identification macros

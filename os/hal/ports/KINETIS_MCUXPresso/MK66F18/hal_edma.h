@@ -29,20 +29,14 @@
  * @brief   K66 eDMA stream descriptor structure.
  */
 typedef struct {
-  edma_tcd_t            *channel;        /**< @brief Associated TCD Channel.  */
-  uint8_t               *dchpri;         /**< @brief Associated DCHPRI.       */
-  uint8_t               selfindex;       /**< @brief Index to self in array. */
+  edma_handle_t         *edma_handle;        /**< @brief Associated EDMA Handle.  */
+  uint8_t               selfindex;          /**< @brief Index to self in array. */
+  uint8_t               vector;
 } kinetis_edma_channel_t;
 
 #define DMAx_IRQn(n)    (DMA0_IRQn + n)
 #define DMA_INT_SHARED_WITH(n) ((n>15)?(n-16):(n+16))
 
-/**
- * @brief   Kinetis eDMA ISR function type.
- *
- * @param[in] p         parameter for the registered function
- */
-typedef void (*kinetis_edmaisr_t)(void *p);
 
 #define KINETIS_DMA_CHANNEL(id)  (&_kinetis_dma_channels[id])
 
@@ -56,19 +50,16 @@ typedef void (*kinetis_edmaisr_t)(void *p);
 /* External declarations.                                                    */
 /*===========================================================================*/
 
-#if !defined(__DOXYGEN__)
-extern const kinetis_edma_channel_t _kinetis_dma_channels[KINETIS_DMA_CHANNELS];
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
   void dmaInit(void);
-  bool dmaChannelAllocate(const kinetis_edma_channel_t *dmach,
-                        uint32_t priority,
-                        kinetis_edmaisr_t func,
-                        void *param);
-  void dmaChannelRelease(const stm32_dma_stream_t *dmach);
+  bool dmaChannelAllocate(edma_handle_t *edma_handle,
+                          uint32_t req_src,
+                          uint32_t priority,
+                          edma_callback func,
+                          void *param);
+  void dmaChannelRelease(const edma_handle_t *edma_handle);
 #ifdef __cplusplus
 }
 #endif

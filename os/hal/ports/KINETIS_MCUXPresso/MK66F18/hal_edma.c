@@ -1,4 +1,4 @@
-
+#include "osal.h"
 #include "hal.h"
 
 /**
@@ -8,92 +8,280 @@
  * @note    Don't use this array directly, use the appropriate wrapper macros
  *          instead.
  */
-const kinetis_dma_channel_t _kinetis_dma_channels[KINETIS_DMA_CHANNELS] = {
-  {&DMA->TCD[0], &DMA->DCHPRI0, 0, KINETIS_DMA0_IRQ_VECTOR},
-  {&DMA->TCD[1], &DMA->DCHPRI1, 1, KINETIS_DMA1_IRQ_VECTOR},
-  {&DMA->TCD[2], &DMA->DCHPRI2, 2, KINETIS_DMA2_IRQ_VECTOR},
-  {&DMA->TCD[3], &DMA->DCHPRI3, 3, KINETIS_DMA3_IRQ_VECTOR},
-  {&DMA->TCD[4], &DMA->DCHPRI4, 4, KINETIS_DMA4_IRQ_VECTOR},
-  {&DMA->TCD[5], &DMA->DCHPRI5, 5, KINETIS_DMA5_IRQ_VECTOR},
-  {&DMA->TCD[6], &DMA->DCHPRI6, 6, KINETIS_DMA6_IRQ_VECTOR},
-  {&DMA->TCD[7], &DMA->DCHPRI7, 7, KINETIS_DMA7_IRQ_VECTOR},
-  {&DMA->TCD[8], &DMA->DCHPRI8, 8, KINETIS_DMA8_IRQ_VECTOR},
-  {&DMA->TCD[9], &DMA->DCHPRI9, 9, KINETIS_DMA9_IRQ_VECTOR},
-  {&DMA->TCD[10], &DMA->DCHPRI10, 10, KINETIS_DMA10_IRQ_VECTOR},
-  {&DMA->TCD[11], &DMA->DCHPRI11, 11, KINETIS_DMA11_IRQ_VECTOR},
-  {&DMA->TCD[12], &DMA->DCHPRI12, 12, KINETIS_DMA12_IRQ_VECTOR},
-  {&DMA->TCD[13], &DMA->DCHPRI13, 13, KINETIS_DMA13_IRQ_VECTOR},
-  {&DMA->TCD[14], &DMA->DCHPRI14, 14, KINETIS_DMA14_IRQ_VECTOR},
-  {&DMA->TCD[15], &DMA->DCHPRI15, 15, KINETIS_DMA15_IRQ_VECTOR},
-  {&DMA->TCD[16], &DMA->DCHPRI16, 16, KINETIS_DMA0_IRQ_VECTOR},
-  {&DMA->TCD[17], &DMA->DCHPRI17, 17, KINETIS_DMA1_IRQ_VECTOR},
-  {&DMA->TCD[18], &DMA->DCHPRI18, 18, KINETIS_DMA2_IRQ_VECTOR},
-  {&DMA->TCD[19], &DMA->DCHPRI19, 19, KINETIS_DMA3_IRQ_VECTOR},
-  {&DMA->TCD[20], &DMA->DCHPRI20, 20, KINETIS_DMA4_IRQ_VECTOR},
-  {&DMA->TCD[21], &DMA->DCHPRI21, 21, KINETIS_DMA5_IRQ_VECTOR},
-  {&DMA->TCD[22], &DMA->DCHPRI22, 22, KINETIS_DMA6_IRQ_VECTOR},
-  {&DMA->TCD[23], &DMA->DCHPRI23, 23, KINETIS_DMA7_IRQ_VECTOR},
-  {&DMA->TCD[24], &DMA->DCHPRI24, 24, KINETIS_DMA8_IRQ_VECTOR},
-  {&DMA->TCD[25], &DMA->DCHPRI25, 25, KINETIS_DMA9_IRQ_VECTOR},
-  {&DMA->TCD[26], &DMA->DCHPRI26, 26, KINETIS_DMA10_IRQ_VECTOR},
-  {&DMA->TCD[27], &DMA->DCHPRI27, 27, KINETIS_DMA11_IRQ_VECTOR},
-  {&DMA->TCD[28], &DMA->DCHPRI28, 28, KINETIS_DMA12_IRQ_VECTOR},
-  {&DMA->TCD[29], &DMA->DCHPRI29, 29, KINETIS_DMA13_IRQ_VECTOR},
-  {&DMA->TCD[30], &DMA->DCHPRI30, 30, KINETIS_DMA14_IRQ_VECTOR},
-  {&DMA->TCD[31], &DMA->DCHPRI31, 31, KINETIS_DMA15_IRQ_VECTOR}
+kinetis_edma_channel_t _kinetis_dma_channels[FSL_FEATURE_EDMA_DMAMUX_CHANNELS] = {
+  {NULL, 0,    DMA0_DMA16_IRQn},
+  {NULL, 1,    DMA1_DMA17_IRQn},
+  {NULL, 2,    DMA2_DMA18_IRQn},
+  {NULL, 3,    DMA3_DMA19_IRQn},
+  {NULL, 4,    DMA4_DMA20_IRQn},
+  {NULL, 5,    DMA5_DMA21_IRQn},
+  {NULL, 6,    DMA6_DMA22_IRQn},
+  {NULL, 7,    DMA7_DMA23_IRQn},
+  {NULL, 8,    DMA8_DMA24_IRQn},
+  {NULL, 9,    DMA9_DMA25_IRQn},
+  {NULL, 10,   DMA10_DMA26_IRQn},
+  {NULL, 11,   DMA11_DMA27_IRQn},
+  {NULL, 12,   DMA12_DMA28_IRQn},
+  {NULL, 13,   DMA13_DMA29_IRQn},
+  {NULL, 14,   DMA14_DMA30_IRQn},
+  {NULL, 15,   DMA15_DMA31_IRQn},
+  {NULL, 16,   DMA0_DMA16_IRQn},
+  {NULL, 17,   DMA1_DMA17_IRQn},
+  {NULL, 18,   DMA2_DMA18_IRQn},
+  {NULL, 19,   DMA3_DMA19_IRQn},
+  {NULL, 20,   DMA4_DMA20_IRQn},
+  {NULL, 21,   DMA5_DMA21_IRQn},
+  {NULL, 22,   DMA6_DMA22_IRQn},
+  {NULL, 23,   DMA7_DMA23_IRQn},
+  {NULL, 24,   DMA8_DMA24_IRQn},
+  {NULL, 25,   DMA9_DMA25_IRQn},
+  {NULL, 26,   DMA10_DMA26_IRQn},
+  {NULL, 27,   DMA11_DMA27_IRQn},
+  {NULL, 28,   DMA12_DMA28_IRQn},
+  {NULL, 29,   DMA13_DMA29_IRQn},
+  {NULL, 30,   DMA14_DMA30_IRQn},
+  {NULL, 31,   DMA15_DMA31_IRQn}
 };
 
-#define DMA_IRQ_HANDLER(DMA_ID1, DMA_ID2) \
-OSAL_IRQ_HANDLER(KINETIS_DMA##DMA_ID1##_IRQ_VECTOR) { \
-  OSAL_IRQ_PROLOGUE(); \
-  if (DMA->INT & DMA_INT_INT##DMA_ID1##_MASK){ \
-    DMA->INT |= DMA_INT_INT##DMA_ID1##_MASK; \
-    if (dma_isr_redir[##DMA_ID1##].dma_func) \
-        dma_isr_redir[##DMA_ID1##].dma_func(dma_isr_redir[##DMA_ID1##].dma_param); \
-  } \
-  if (DMA->INT & DMA_INT_INT##DMA_ID2##_MASK){ \
-    DMA->INT |= DMA_INT_INT##DMA_ID2##_MASK; \
-    if (dma_isr_redir[##DMA_ID2##].dma_func) \
-        dma_isr_redir[##DMA_ID2##].dma_func(dma_isr_redir[##DMA_ID2##].dma_param); \
-  } \
-  OSAL_IRQ_EPILOGUE(); \
-} \
+OSAL_IRQ_HANDLER(KINETIS_DMA0_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 0) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[0].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[0].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 16) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[16].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[16].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
-DMA_IRQ_HANDLER(0, 16)
-DMA_IRQ_HANDLER(1, 17)
-DMA_IRQ_HANDLER(2, 18)
-DMA_IRQ_HANDLER(3, 19)
-DMA_IRQ_HANDLER(4, 20)
-DMA_IRQ_HANDLER(5, 21)
-DMA_IRQ_HANDLER(6, 22)
-DMA_IRQ_HANDLER(7, 23)
-DMA_IRQ_HANDLER(8, 24)
-DMA_IRQ_HANDLER(9, 25)
-DMA_IRQ_HANDLER(10, 26)
-DMA_IRQ_HANDLER(11, 27)
-DMA_IRQ_HANDLER(12, 28)
-DMA_IRQ_HANDLER(13, 29)
-DMA_IRQ_HANDLER(14, 30)
-DMA_IRQ_HANDLER(15, 31)
+OSAL_IRQ_HANDLER(KINETIS_DMA1_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 1) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[1].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[1].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 17) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[17].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[17].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
-/**
- * @brief   DMA ISR redirector type.
- */
-typedef struct {
-  kinetis_dmaisr_t        dma_func;       /**< @brief DMA callback function.  */
-  void                  *dma_param;     /**< @brief DMA callback parameter. */
-} dma_isr_redir_t;
+OSAL_IRQ_HANDLER(KINETIS_DMA2_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 2) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[2].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[2].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 18) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[18].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[18].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
-/**
- * @brief   Mask of the allocated streams.
- */
-static uint32_t dma_channels_mask;
+OSAL_IRQ_HANDLER(KINETIS_DMA3_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 3) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[3].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[3].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 19) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[19].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[19].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
+OSAL_IRQ_HANDLER(KINETIS_DMA4_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 4) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[4].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[4].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 20) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[20].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[20].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
-/**
- * @brief   DMA IRQ redirectors.
- */
-static dma_isr_redir_t dma_isr_redir[KINETIS_DMA_CHANNELS];
+OSAL_IRQ_HANDLER(KINETIS_DMA5_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 5) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[5].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[5].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 21) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[21].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[21].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA6_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 6) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[6].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[6].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 22) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[22].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[22].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA7_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 7) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[7].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[7].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 23) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[23].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[23].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA8_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 8) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[8].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[8].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 24) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[24].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[24].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA9_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 9) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[9].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[9].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 25) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[25].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[25].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA10_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 10) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[10].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[10].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 26) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[26].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[26].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA11_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 11) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[11].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[11].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 27) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[27].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[27].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA12_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 12) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[12].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[12].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 28) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[28].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[28].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA13_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 13) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[13].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[13].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 29) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[29].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[29].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA14_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 14) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[14].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[14].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 30) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[30].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[30].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
+
+OSAL_IRQ_HANDLER(KINETIS_DMA15_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  if ((EDMA_GetChannelStatusFlags(DMA0, 15) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[15].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[15].edma_handle);
+    }
+  }
+  if ((EDMA_GetChannelStatusFlags(DMA0, 31) & kEDMA_InterruptFlag) != 0U) {
+    if (_kinetis_dma_channels[31].edma_handle != NULL) {
+      EDMA_HandleIRQ(_kinetis_dma_channels[31].edma_handle);
+  }
+  }
+  OSAL_IRQ_EPILOGUE();
+}
 
 edma_config_t global_dma_config;
 
@@ -128,27 +316,32 @@ void dmaInit(void)
  *
  * @special
 */
-bool dmaChannelAllocate(const kinetis_edma_channel_t *dmach,
+bool dmaChannelAllocate(edma_handle_t *edma_handle,
+                        uint32_t req_src,
                         uint32_t priority,
-                        kinetis_edmaisr_t func,
+                        edma_callback func,
                         void *param) {
+  kinetis_edma_channel_t *dmach;
+  for(uint8_t i = 0; i < FSL_FEATURE_EDMA_DMAMUX_CHANNELS; i++) {
+    /* Checks if the stream is already taken.*/
+    dmach = KINETIS_DMA_CHANNEL(i);
+    if (dmach->edma_handle != NULL)
+      continue;
+    
+    DMAMUX_SetSource(DMAMUX0, i, req_src);
+    if (req_src != kDmaRequestMux0Disable) {
+      DMAMUX_EnableChannel(DMAMUX0, i);
+    }
+    EDMA_CreateHandle(edma_handle, DMA0, i);
 
-  osalDbgCheck(dmach != NULL);
-
-  /* Checks if the stream is already taken.*/
-  if ((dma_channels_mask & (1U << dmach->selfindex)) != 0U)
-    return true;
-
-  /* Marks the stream as allocated.*/
-  dma_isr_redir[dmach->selfindex].dma_func  = func;
-  dma_isr_redir[dmach->selfindex].dma_param = param;
-  dma_channels_mask |= (1U << dmach->selfindex);
-  /* Enables the associated IRQ vector if a callback is defined.*/
-  if (func != NULL) {
+    dmach->edma_handle = edma_handle;
+    if (func != NULL) {
+      EDMA_SetCallback(edma_handle, func, param);
+    }
     nvicEnableVector(dmach->vector, priority);
+    return false;
   }
-
-  return false;
+  return true;
 }
 
 /**
@@ -164,19 +357,19 @@ bool dmaChannelAllocate(const kinetis_edma_channel_t *dmach,
  *
  * @special
  */
-void dmaChannelRelease(const stm32_dma_stream_t *dmach) {
+void dmaChannelRelease(const edma_handle_t *edma_handle) {
 
-  osalDbgCheck(dmach != NULL);
-
+  osalDbgCheck(edma_handle != NULL);
+  kinetis_edma_channel_t *dmach = KINETIS_DMA_CHANNEL(edma_handle->channel);
   /* Check if the streams is not taken.*/
-  osalDbgAssert((dma_channels_mask & (1U << dmach->selfindex)) != 0U,
+  osalDbgAssert(dmach->edma_handle != NULL,
                 "not allocated");
 
   /* Disables the associated IRQ vector if unused.*/
-  if (!(dma_channels_mask & (1U << DMA_INT_SHARED_WITH(dmach->selfindex)))) {
+  if (KINETIS_DMA_CHANNEL(DMA_INT_SHARED_WITH(edma_handle->channel))->edma_handle == NULL) {
     nvicDisableVector(dmach->vector);
   }
 
   /* Marks the stream as not allocated.*/
-  dma_channels_mask &= ~(1U << dmach->selfindex);
+  dmach->edma_handle = NULL;
 }

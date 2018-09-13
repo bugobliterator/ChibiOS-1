@@ -22,6 +22,7 @@
  * @{
  */
 
+#include "osal.h"
 #include "hal.h"
 
 #if (HAL_USE_I2C == TRUE) || defined(__DOXYGEN__)
@@ -40,6 +41,9 @@
 #if (KINETIS_I2C_USE_I2C0 == TRUE) || defined(__DOXYGEN__)
 I2CDriver I2CD0;
 #endif
+#if (KINETIS_I2C_USE_I2C1 == TRUE) || defined(__DOXYGEN__)
+I2CDriver I2CD1;
+#endif
 
 I2CConfig default_i2c_config;
 /*===========================================================================*/
@@ -57,6 +61,49 @@ I2CConfig default_i2c_config;
 /*===========================================================================*/
 /* Driver exported functions.                                                */
 /*===========================================================================*/
+#if (KINETIS_I2C_USE_I2C0 == TRUE) || defined(__DOXYGEN__)
+OSAL_IRQ_HANDLER(KINETIS_I2C0_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  I2C_MasterTransferHandleIRQ(I2C0, I2CD0.i2c_handle);
+  OSAL_IRQ_EPILOGUE();
+}
+#endif
+
+#if (KINETIS_I2C_USE_I2C1 == TRUE) || defined(__DOXYGEN__)
+OSAL_IRQ_HANDLER(KINETIS_I2C1_IRQ_VECTOR) {
+  OSAL_IRQ_PROLOGUE();
+  I2C_MasterTransferHandleIRQ(I2C1, I2CD1.i2c_handle);
+  OSAL_IRQ_EPILOGUE();
+}
+#endif
+
+static void i2c_master_edma_callback(I2C_Type *base, i2c_master_edma_handle_t *handle, status_t status, void *userData)
+{
+  (void)base;
+  (void)handle;
+  /* Signal transfer success when received success status. */
+  I2CDriver* i2cp = (I2CDriver*)userData;
+  if (status == kStatus_Success)
+  {
+    _i2c_wakeup_isr(i2cp);
+  } else {
+    _i2c_wakeup_error_isr(i2cp);
+  }
+}
+
+static void i2c_master_irq_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData)
+{
+  (void)base;
+  (void)handle;
+  /* Signal transfer success when received success status. */
+  I2CDriver* i2cp = (I2CDriver*)userData;
+  if (status == kStatus_Success)
+  {
+    _i2c_wakeup_isr(i2cp);
+  } else {
+    _i2c_wakeup_error_isr(i2cp);
+  }
+}
 
 /**
  * @brief   Low level I2C driver initialization.
@@ -68,8 +115,17 @@ void i2c_lld_init(void) {
   i2cObjectInit(&I2CD0);
   I2CD0.thread = NULL;
   I2CD0.i2c = I2C0;
-  I2CD0.edma = KINETIS_DMA_CHANNEL(KINETIS_I2C_I2C0_DMA_CHAN);
+  I2CD0.irq_prio = KINETIS_I2C_I2C0_IRQ_PRIORITY;
+  I2CD0.vector = I2C0_IRQn;
   memset(&I2CD0.transfer, 0, sizeof(I2CD0.transfer));
+#endif
+#if KINETIS_I2C_USE_I2C1 == TRUE
+  i2cObjectInit(&I2CD1);
+  I2CD1.thread = NULL;
+  I2CD1.i2c = I2C1;
+  I2CD1.irq_prio = KINETIS_I2C_I2C1_IRQ_PRIORITY;
+  I2CD1.vector = I2C1_IRQn;
+  memset(&I2CD1.transfer, 0, sizeof(I2CD1.transfer));
 #endif
 }
 
@@ -90,11 +146,14 @@ void i2c_lld_start(I2CDriver *i2cp) {
     /* Enables the peripheral.*/
 #if KINETIS_I2C_USE_I2C0 == TRUE
     if (&I2CD0 == i2cp) {
-      I2C_MasterInit(i2cp->i2c, i2cp->config, CLOCK_GetFreq(BUS_CLK));
-      DMAMUX_SetSource(DMAMUX0, KINETIS_I2C_I2C0_DMA_CHAN, kDmaRequestMux0I2C0);
-      EDMA_CreateHandle(&i2cp->edma_handle, DMA0, KINETIS_I2C_I2C0_DMA_CHAN);
-      dmaChannelAllocate(i2cp->edma, KINETIS_I2C_I2C0_DMA_PRIORITY, NULL, (void *)i2cp);
-      DMAMUX_EnableChannel(DMAMUX0, KINETIS_I2C_I2C0_DMA_CHAN);
+      I2C_MasterInit(i2cp->i2c, i2cp->config, CLOCK_GetFreq(I2C0_CLK_SRC));
+      dmaChannelAllocate(&i2cp->edma_handle, kDmaRequestMux0I2C0, KINETIS_I2C_I2C0_IRQ_PRIORITY, NULL, (void *)i2cp);
+    }
+#endif
+#if KINETIS_I2C_USE_I2C1 == TRUE
+    if (&I2CD1 == i2cp) {
+      I2C_MasterInit(i2cp->i2c, i2cp->config, CLOCK_GetFreq(I2C1_CLK_SRC));
+      dmaChannelAllocate(&i2cp->edma_handle, kDmaRequestMux0I2C1, KINETIS_I2C_I2C1_IRQ_PRIORITY, NULL, (void *)i2cp);
     }
 #endif
   }
@@ -111,11 +170,17 @@ void i2c_lld_start(I2CDriver *i2cp) {
 void i2c_lld_stop(I2CDriver *i2cp) {
 
   if (i2cp->state != I2C_STOP) {
-
     /* Disables the peripheral.*/
 #if KINETIS_I2C_USE_I2C0 == TRUE
+    if (&I2CD0 == i2cp) {
+      I2C_MasterStop(i2cp->i2c);
+      dmaChannelRelease(&i2cp->edma_handle);
+    }
+#endif
+#if KINETIS_I2C_USE_I2C1 == TRUE
     if (&I2CD1 == i2cp) {
-
+      I2C_MasterStop(i2cp->i2c);
+      dmaChannelRelease(&i2cp->edma_handle);
     }
 #endif
   }
@@ -145,14 +210,31 @@ void i2c_lld_stop(I2CDriver *i2cp) {
 msg_t i2c_lld_master_receive_timeout(I2CDriver *i2cp, i2caddr_t addr,
                                      uint8_t *rxbuf, size_t rxbytes,
                                      systime_t timeout) {
+  i2c_master_transfer_t masterXfer;
+  i2c_master_edma_handle_t i2c_master_edma_handle;
+  i2c_master_handle_t i2c_master_handle;
+  memset(&masterXfer, 0, sizeof(masterXfer));
+  masterXfer.slaveAddress = addr;
+  masterXfer.direction = kI2C_Read;
+  masterXfer.data = rxbuf;
+  masterXfer.dataSize = rxbytes;
+  masterXfer.flags = kI2C_TransferDefaultFlag;
 
-  (void)i2cp;
-  (void)addr;
-  (void)rxbuf;
-  (void)rxbytes;
-  (void)timeout;
-
-  return MSG_OK;
+  if (masterXfer.dataSize > 1) {
+    I2C_MasterCreateEDMAHandle(i2cp->i2c, &i2c_master_edma_handle, i2c_master_edma_callback, i2cp, &i2cp->edma_handle);
+    I2C_MasterTransferEDMA(i2cp->i2c, &i2c_master_edma_handle, &masterXfer);
+  } else {
+    I2C_MasterTransferCreateHandle(i2cp->i2c, &i2c_master_handle, i2c_master_irq_callback, i2cp);
+    i2cp->i2c_handle = &i2c_master_handle;
+    nvicEnableVector(i2cp->vector, i2cp->irq_prio);
+    I2C_MasterTransferNonBlocking(i2cp->i2c, &i2c_master_handle, &masterXfer);
+    /* Waits for the operation completion or a timeout.*/
+    msg_t msg = osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
+    nvicDisableVector(i2cp->vector);
+    return msg;
+  }
+  /* Waits for the operation completion or a timeout.*/
+  return osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
 }
 
 /**
@@ -182,16 +264,64 @@ msg_t i2c_lld_master_transmit_timeout(I2CDriver *i2cp, i2caddr_t addr,
                                       const uint8_t *txbuf, size_t txbytes,
                                       uint8_t *rxbuf, size_t rxbytes,
                                       systime_t timeout) {
+  i2c_master_transfer_t masterXfer;
+  i2c_master_edma_handle_t i2c_master_edma_handle;
+  i2c_master_handle_t i2c_master_handle;
+  if (txbytes > 4 || rxbytes == 0) {
+    //do pure write
+    if (rxbytes == 0) {
+      memset(&masterXfer, 0, sizeof(masterXfer));
+      masterXfer.slaveAddress = addr;
+      masterXfer.direction = kI2C_Write;
+      masterXfer.data = (uint8_t*)txbuf;
+      masterXfer.dataSize = txbytes;
+      masterXfer.flags = kI2C_TransferDefaultFlag;
 
-  (void)i2cp;
-  (void)addr;
-  (void)txbuf;
-  (void)txbytes;
-  (void)rxbuf;
-  (void)rxbytes;
-  (void)timeout;
+      if (masterXfer.dataSize > 1) {
+        I2C_MasterCreateEDMAHandle(i2cp->i2c, &i2c_master_edma_handle, i2c_master_edma_callback, i2cp, &i2cp->edma_handle);
+        I2C_MasterTransferEDMA(i2cp->i2c, &i2c_master_edma_handle, &masterXfer);
+        /* Waits for the operation completion or a timeout.*/
+        return osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
+      } else {
+        I2C_MasterTransferCreateHandle(i2cp->i2c, &i2c_master_handle, i2c_master_irq_callback, i2cp);
+        i2cp->i2c_handle = &i2c_master_handle;
+        nvicEnableVector(i2cp->vector, i2cp->irq_prio);
+        I2C_MasterTransferNonBlocking(i2cp->i2c, &i2c_master_handle, &masterXfer);
+        /* Waits for the operation completion or a timeout.*/
+        msg_t msg = osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
+        nvicDisableVector(i2cp->vector);
+        return msg;
+      }
+    }
+    //MCUXpresso API doesn't supportt asynch transactions beyond 4bytes
+    return MSG_RESET;
+  }
+  uint32_t reg_addr = 0;
+  memcpy(&reg_addr, txbuf, txbytes);
+  memset(&masterXfer, 0, sizeof(masterXfer));
+  masterXfer.slaveAddress = addr;
+  masterXfer.direction = kI2C_Read;
+  masterXfer.subaddress = reg_addr;
+  masterXfer.subaddressSize = txbytes;
+  masterXfer.data = rxbuf;
+  masterXfer.dataSize = rxbytes;
+  masterXfer.flags = kI2C_TransferDefaultFlag;
 
-  return MSG_OK;
+  if (masterXfer.dataSize > 1) {
+    I2C_MasterCreateEDMAHandle(i2cp->i2c, &i2c_master_edma_handle, i2c_master_edma_callback, i2cp, &i2cp->edma_handle);
+    I2C_MasterTransferEDMA(i2cp->i2c, &i2c_master_edma_handle, &masterXfer);
+  } else {
+    I2C_MasterTransferCreateHandle(i2cp->i2c, &i2c_master_handle, i2c_master_irq_callback, i2cp);
+    i2cp->i2c_handle = &i2c_master_handle;
+    nvicEnableVector(i2cp->vector, i2cp->irq_prio);
+    I2C_MasterTransferNonBlocking(i2cp->i2c, &i2c_master_handle, &masterXfer);
+    /* Waits for the operation completion or a timeout.*/
+    msg_t msg = osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
+    nvicDisableVector(i2cp->vector);
+    return msg;
+  }
+  /* Waits for the operation completion or a timeout.*/
+  return osalThreadSuspendTimeoutS(&i2cp->thread, timeout);
 }
 
 #endif /* HAL_USE_I2C == TRUE */

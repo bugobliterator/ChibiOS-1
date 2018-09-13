@@ -26,6 +26,7 @@
 #define HAL_I2C_LLD_H
 
 #if (HAL_USE_I2C == TRUE) || defined(__DOXYGEN__)
+#include "fsl_i2c_edma.h"
 
 /*===========================================================================*/
 /* Driver constants.                                                         */
@@ -40,12 +41,21 @@
  * @{
  */
 /**
- * @brief   I2C1 driver enable switch.
- * @details If set to @p TRUE the support for I2C1 is included.
+ * @brief   I2C0 driver enable switch.
+ * @details If set to @p TRUE the support for I2C0 is included.
  * @note    The default is @p FALSE.
  */
 #if !defined(KINETIS_I2C_USE_I2C0) || defined(__DOXYGEN__)
 #define KINETIS_I2C_USE_I2C0                  FALSE
+#endif
+
+/**
+ * @brief   I2C1 driver enable switch.
+ * @details If set to @p TRUE the support for I2C1 is included.
+ * @note    The default is @p FALSE.
+ */
+#if !defined(KINETIS_I2C_USE_I2C1) || defined(__DOXYGEN__)
+#define KINETIS_I2C_USE_I2C1                  FALSE
 #endif
 /** @} */
 
@@ -101,11 +111,17 @@ struct I2CDriver {
 #if defined(I2C_DRIVER_EXT_FIELDS)
   I2C_DRIVER_EXT_FIELDS
 #endif
+  /**
+   * @brief   Thread waiting for I/O completion.
+   */
+  thread_reference_t        thread;
   /* End of the mandatory fields.*/
   I2C_Type                  *i2c;
-  kinetis_edma_channel_t    *edma;
   edma_handle_t             edma_handle;
   i2c_master_transfer_t     transfer;
+  uint8_t                   irq_prio;
+  uint32_t                  vector;
+  void                      *i2c_handle;
 };
 
 /*===========================================================================*/
@@ -127,6 +143,10 @@ struct I2CDriver {
 
 #if (KINETIS_I2C_USE_I2C0 == TRUE) && !defined(__DOXYGEN__)
 extern I2CDriver I2CD0;
+#endif
+
+#if (KINETIS_I2C_USE_I2C1 == TRUE) && !defined(__DOXYGEN__)
+extern I2CDriver I2CD1;
 #endif
 
 #ifdef __cplusplus
