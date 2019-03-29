@@ -39,6 +39,7 @@
 
 #include "ch.h"
 #include "wolfssl_chibios.h"
+#ifndef SKIP_WOLFSSL_BINDINGS
 #include "lwip/opt.h"
 #include "lwip/arch.h"
 #include "lwip/api.h"
@@ -178,6 +179,7 @@ int wolfssl_recv_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx)
         return 0;
     //return WOLFSSL_CBIO_ERR_WANT_READ;
 }
+#endif
 
 #ifndef ST2S
 #   define ST2S(n) (((n) + CH_CFG_ST_FREQUENCY - 1UL) / CH_CFG_ST_FREQUENCY)
