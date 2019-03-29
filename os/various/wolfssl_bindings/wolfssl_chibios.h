@@ -40,13 +40,15 @@
 #define WOLFSSL_SK_H
 #include "wolfssl/ssl.h"
 #include "wolfssl/wolfcrypt/types.h"
-#include "lwip/opt.h"
-#include "lwip/arch.h"
-#include "lwip/api.h"
 #include "user_settings.h"
 #define XMALLOC(s,h,t) chibios_alloc(h,s)
 #define XFREE(p,h,t)   chibios_free(p)
 
+
+#ifndef SKIP_WOLFSSL_BINDINGS
+#include "lwip/opt.h"
+#include "lwip/arch.h"
+#include "lwip/api.h"
 struct sslconn {
     WOLFSSL_CTX *ctx;
     WOLFSSL *ssl;
@@ -65,5 +67,5 @@ int wolfssl_recv_cb(WOLFSSL *ssl, char *buf, int sz, void *ctx);
 void *chibios_alloc(void *heap, int size);
 void chibios_free(void *ptr);
 word32 LowResTimer(void);
-
+#endif
 #endif
