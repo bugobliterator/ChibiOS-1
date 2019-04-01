@@ -164,9 +164,7 @@
 
 #include <wolfssl/wolfcrypt/visibility.h>
 
-#ifdef WOLFSSL_USER_SETTINGS
-    #include "user_settings.h"
-#endif
+#include "wolfcrypt_user_settings.h"
 
 
 /* make sure old RNG name is used with CTaoCrypt FIPS */

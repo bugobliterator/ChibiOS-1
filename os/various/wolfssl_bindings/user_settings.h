@@ -4,7 +4,8 @@
 
 #define WOLFSSL_GENERAL_ALIGNMENT 4
 #define HAVE_TM_TYPE
-
+#define WOLFSSL_NO_SOCK
+#define SKIP_WOLFSSL_BINDINGS
 
 /* ChibiOS + Lwip */
 #define HAVE_LWIP_NATIVE 
@@ -36,6 +37,8 @@
 #define HAVE_CHACHA 
 #define HAVE_POLY1305 
 #define HAVE_ECC 
+#define HAVE_COMP_KEY
+#define WOLFSSL_KEY_GEN
 #define HAVE_CURVE25519
 #define CURVED25519_SMALL
 #define HAVE_ONE_TIME_AUTH

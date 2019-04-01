@@ -28,6 +28,7 @@
 
 
 /* for users not using preprocessor flags*/
+#include "user_settings.h"
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/version.h>
 
