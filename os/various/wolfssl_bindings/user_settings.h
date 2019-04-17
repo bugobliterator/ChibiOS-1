@@ -1,11 +1,9 @@
-#include <stdint.h>
-
+#include "wolfssl_helpers.h"
 /* Configuration */
 
 #define WOLFSSL_GENERAL_ALIGNMENT 4
 #define HAVE_TM_TYPE
 #define WOLFSSL_NO_SOCK
-#define SKIP_WOLFSSL_BINDINGS
 
 /* ChibiOS + Lwip */
 #define HAVE_LWIP_NATIVE 

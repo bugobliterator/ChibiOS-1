@@ -39,6 +39,7 @@
 
 #include "ch.h"
 #include "wolfssl_chibios.h"
+#include "wolfssl_helpers.h"
 #ifndef SKIP_WOLFSSL_BINDINGS
 #include "lwip/opt.h"
 #include "lwip/arch.h"
