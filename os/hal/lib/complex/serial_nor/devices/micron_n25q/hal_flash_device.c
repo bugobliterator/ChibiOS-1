@@ -96,6 +96,7 @@ const wspi_command_t snor_memmap_read = {
 /*===========================================================================*/
 
 #if SNOR_BUS_DRIVER == SNOR_BUS_DRIVER_WSPI
+
 /* Initial N25Q_CMD_READ_ID command.*/
 static const wspi_command_t n25q_cmd_read_id = {
   .cmd              = N25Q_CMD_READ_ID,
@@ -174,11 +175,11 @@ static const wspi_command_t n25q_cmd_write_enable = {
 
 /* Bus width initialization.*/
 #if N25Q_BUS_MODE == N25Q_BUS_MODE_WSPI1L
-static const uint8_t n25q_evconf_value[1] = {0xCF};
+static const uint8_t n25q_evconf_value[1] = {0x6F};
 #elif N25Q_BUS_MODE == N25Q_BUS_MODE_WSPI2L
-static const uint8_t n25q_evconf_value[1] = {0x8F};
+static const uint8_t n25q_evconf_value[1] = {0xAF};
 #else
-static const uint8_t n25q_evconf_value[1] = {0x4F};
+static const uint8_t n25q_evconf_value[1] = {0x2F};
 #endif
 #endif /* SNOR_BUS_DRIVER == SNOR_BUS_DRIVER_WSPI */
 
@@ -353,9 +354,28 @@ void snor_device_init(SNORDriver *devp) {
 #endif
 
   /* Setting up the device size.*/
-  snor_descriptor.sectors_count = (1U << (size_t)devp->device_id[2]) /
-                                  SECTOR_SIZE;
-  snor_descriptor.size = (size_t)snor_descriptor.sectors_count * SECTOR_SIZE;
+  if (devp->device_id[2] == 0x17) {
+    snor_descriptor.size = ((64*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  } else if (devp->device_id[2] == 0x18) {
+    snor_descriptor.size = ((128*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  } else if (devp->device_id[2] == 0x19) {
+    snor_descriptor.size = ((256*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  } else if (devp->device_id[2] == 0x20) {
+    snor_descriptor.size = ((512*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  } else if (devp->device_id[2] == 0x21) {
+    snor_descriptor.size = ((1024*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  } else if (devp->device_id[2] == 0x22) {
+    snor_descriptor.size = ((2048*1024)/8)*1024;
+    snor_descriptor.sectors_count = snor_descriptor.size / SECTOR_SIZE;
+  }
+
+  // bus_cmd_receive(devp->config->busp, N25Q_CMD_MULTIPLE_IO_READ_ID, 3, id);
+
 
 #if SNOR_BUS_DRIVER == SNOR_BUS_DRIVER_WSPI
   {
@@ -434,12 +454,37 @@ flash_error_t snor_device_start_erase_all(SNORDriver *devp) {
   return FLASH_NO_ERROR;
 }
 
+static flash_error_t mt25t_read_status(SNORDriver *devp, uint8_t *sts) {
+  // READ status register command
+  bus_cmd_receive(devp->config->busp, N25Q_CMD_READ_STATUS_REGISTER,
+                  1, sts);
+  return FLASH_NO_ERROR;
+}
+
 flash_error_t snor_device_start_erase_sector(SNORDriver *devp,
                                              flash_sector_t sector) {
   flash_offset_t offset = (flash_offset_t)(sector * SECTOR_SIZE);
 
+  uint32_t msec;
+  flash_error_t ret = snor_device_query_erase(devp, &msec);
+  if (ret != FLASH_NO_ERROR) {
+    return ret;
+  }
+
   /* Enabling write operation.*/
   bus_cmd(devp->config->busp, N25Q_CMD_WRITE_ENABLE);
+
+  uint8_t num_of_try = 0;
+  uint8_t sts = 0;
+  // ensure the write latch bit is set
+  do {
+		num_of_try++;
+    mt25t_read_status(devp, &sts);
+  } while((~sts & 0x02) && (num_of_try < 255));
+
+  if(num_of_try == 255) {
+    return FLASH_ERROR_ERASE;
+  }
 
   /* Sector erase command.*/
   bus_cmd_addr(devp->config->busp, N25Q_CMD_SECTOR_ERASE, offset);
@@ -489,7 +534,7 @@ flash_error_t snor_device_verify_erase(SNORDriver *devp,
 flash_error_t snor_device_query_erase(SNORDriver *devp, uint32_t *msec) {
   uint8_t sts;
 
-  /* Read status command.*/
+  /* Read flag status command.*/
   bus_cmd_receive(devp->config->busp, N25Q_CMD_READ_FLAG_STATUS_REGISTER,
                   1, &sts);
 

@@ -25,7 +25,7 @@
 #include "mfs_test_root.h"
 
 #include "portab.h"
-
+#include "usbcfg.h"
 const SNORConfig snorcfg1 = {
   .busp             = &PORTAB_WSPI1,
   .buscfg           = &WSPIcfg1
@@ -78,12 +78,27 @@ int main(void) {
   portab_setup();
 
   /* Starting a serial port for test report output.*/
-  sdStart(&PORTAB_SD1, NULL);
+
+  /*
+   * Initializes a serial-over-USB CDC driver.
+   */
+  sduObjectInit(&PORTAB_SDU1);
+  sduStart(&PORTAB_SDU1, &serusbcfg);
+
+  /*
+   * Activates the USB driver and then the USB bus pull-up on D+.
+   * Note, a delay is inserted in order to not have to disconnect the cable
+   * after a reset.
+   */
+  usbDisconnectBus(serusbcfg.usbp);
+  chThdSleepMilliseconds(1500);
+  usbStart(serusbcfg.usbp, &usbcfg);
+  usbConnectBus(serusbcfg.usbp);
 
   /* Initializing and starting snor1 driver.*/
   snorObjectInit(&snor1);
   snorStart(&snor1, &snorcfg1);
-#if 1
+#if 0
   /* Testing memory mapped mode.*/
   {
     uint8_t *addr;
@@ -98,9 +113,9 @@ int main(void) {
 
   /* Normal main() thread activity, in this demo it does nothing.*/
   while (true) {
-    if (palReadLine(PORTAB_LINE_BUTTON) == PORTAB_BUTTON_PRESSED) {
-       test_execute((BaseSequentialStream *)&PORTAB_SD1, &mfs_test_suite);
-    }
+    // if (palReadLine(PORTAB_LINE_BUTTON) == PORTAB_BUTTON_PRESSED) {
+       test_execute((BaseSequentialStream *)&PORTAB_SDU1, &mfs_test_suite);
+    // }
     chThdSleepMilliseconds(500);
   }
   return 0;
