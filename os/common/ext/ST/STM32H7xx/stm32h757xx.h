@@ -2812,7 +2812,7 @@ typedef struct
 
 #define DBGMCU              ((DBGMCU_TypeDef *) DBGMCU_BASE)
 
-#define JPEG                ((JPEG_TypeDef *) JPGDEC_BASE)
+// #define JPEG                ((JPEG_TypeDef *) JPGDEC_BASE)
 #define HSEM                ((HSEM_TypeDef *) HSEM_BASE)
 #if defined(CORE_CM4)
 #define HSEM_COMMON         ((HSEM_Common_TypeDef *) (HSEM_BASE + 0x110UL))

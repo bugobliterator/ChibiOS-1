@@ -72,7 +72,7 @@
  *  @brief  IP Address.
  */
 #if !defined(LWIP_IPADDR) || defined(__DOXYGEN__)
-#define LWIP_IPADDR(p)                      IP4_ADDR(p, 192, 168, 1, 10)
+#define LWIP_IPADDR(p)                      IP4_ADDR(p, 192, 168, 1, 50)
 #endif
 
 /**
