@@ -275,7 +275,7 @@ struct MACDriver {
   /**
    * @brief PHY address (pre shifted).
    */
-  uint32_t phyaddr;
+  uint32_t phyaddrmask;
   /**
    * @brief Receive next frame index.
    */
@@ -339,8 +339,8 @@ extern MACDriver ETHD1;
 #ifdef __cplusplus
 extern "C" {
 #endif
-  void mii_write(MACDriver *macp, uint32_t reg, uint32_t value);
-  uint32_t mii_read(MACDriver *macp, uint32_t reg);
+  void mii_write(MACDriver *macp, uint8_t phyaddr, uint32_t reg, uint32_t value);
+  uint32_t mii_read(MACDriver *macp, uint8_t phyaddr, uint32_t reg);
   void mac_lld_init(void);
   void mac_lld_start(MACDriver *macp);
   void mac_lld_stop(MACDriver *macp);

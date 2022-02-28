@@ -147,10 +147,10 @@ static uint32_t __eth_tb[STM32_MAC_TRANSMIT_BUFFERS][BUFFER_SIZE]
  *
  * @notapi
  */
-void mii_write(MACDriver *macp, uint32_t reg, uint32_t value) {
-
+void mii_write(MACDriver *macp, uint8_t phyaddr, uint32_t reg, uint32_t value) {
+  (void)macp;
   ETH->MACMDIODR = value;
-  ETH->MACMDIOAR = macp->phyaddr | (reg << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR |
+  ETH->MACMDIOAR = (phyaddr << ETH_MACMDIOAR_PA_Pos) | (reg << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR |
                   ETH_MACMDIOAR_MOC_WR | ETH_MACMDIOAR_MB;
   while ((ETH->MACMDIOAR & ETH_MACMDIOAR_MB) != 0)
     ;
@@ -166,9 +166,9 @@ void mii_write(MACDriver *macp, uint32_t reg, uint32_t value) {
  *
  * @notapi
  */
-uint32_t mii_read(MACDriver *macp, uint32_t reg) {
-
-  ETH->MACMDIOAR = macp->phyaddr | (reg << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR |
+uint32_t mii_read(MACDriver *macp, uint8_t phyaddr, uint32_t reg) {
+  (void)macp;
+  ETH->MACMDIOAR = (phyaddr << ETH_MACMDIOAR_PA_Pos) | (reg << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR |
                   ETH_MACMDIOAR_MOC_RD | ETH_MACMDIOAR_MB;
   while ((ETH->MACMDIOAR & ETH_MACMDIOAR_MB) != 0)
     ;
@@ -189,17 +189,15 @@ static void mii_find_phy(MACDriver *macp) {
  do {
 #endif
     for (i = 0U; i <= 31U; i++) {
-#if BOARD_PHY_ID == MII_KSZ9896C_ID
-      // Note, if this is not detected then it will loop forever
-      i = 5;
-#endif
-      macp->phyaddr = i << ETH_MACMDIOAR_PA_Pos;
       ETH->MACMDIOAR = (i << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR;
       ETH->MACMDIODR = (i << ETH_MACMDIODR_RA_Pos) | MACMDIODR_CR;
-      if ((mii_read(macp, MII_PHYSID1) == (BOARD_PHY_ID >> 16U)) &&
-          ((mii_read(macp, MII_PHYSID2) & 0xFFF0U) == (BOARD_PHY_ID & 0xFFF0U))) {
-        return;
+      if ((mii_read(macp, i, MII_PHYSID1) == (BOARD_PHY_ID >> 16U)) &&
+          ((mii_read(macp, i, MII_PHYSID2) & 0xFFF0U) == (BOARD_PHY_ID & 0xFFF0U))) {
+        macp->phyaddrmask |= 1<<i;
       }
+    }
+    if (macp->phyaddrmask) {
+      return;
     }
 #if STM32_MAC_PHY_TIMEOUT > 0
     n--;
@@ -333,7 +331,9 @@ void mac_lld_init(void) {
 
   /* PHY address setup.*/
 #if defined(BOARD_PHY_ADDRESS)
-  ETHD1.phyaddr = BOARD_PHY_ADDRESS << ETH_MACMDIOAR_PA_Pos;
+  ETHD1.phyaddrmask = 1 << BOARD_PHY_ADDRESS; //BOARD_PHY_ADDRESS << ETH_MACMDIOAR_PA_Pos;
+#elif defined(BOARD_PHY_ADDRESS_MASK)
+  ETHD1.phyaddrmask = BOARD_PHY_ADDRESS_MASK;
 #else
   mii_find_phy(&ETHD1);
 #endif
@@ -343,17 +343,25 @@ void mac_lld_init(void) {
   BOARD_PHY_RESET();
 #else
   /* PHY soft reset procedure.*/
-  mii_write(&ETHD1, MII_BMCR, BMCR_RESET);
+  for (uint8_t i = 0; i < 32; i++) {
+    if (ETHD1.phyaddrmask & (1 << i)) {
+      mii_write(&ETHD1, i, MII_BMCR, BMCR_RESET);
 #if defined(BOARD_PHY_RESET_DELAY)
-  osalSysPolledDelayX(BOARD_PHY_RESET_DELAY);
+      osalSysPolledDelayX(BOARD_PHY_RESET_DELAY);
 #endif
-  while (mii_read(&ETHD1, MII_BMCR) & BMCR_RESET)
-    ;
+      while (mii_read(&ETHD1, i, MII_BMCR) & BMCR_RESET)
+      ;
+    }
+  }
 #endif
 
 #if STM32_MAC_ETH1_CHANGE_PHY_STATE
   /* PHY in power down mode until the driver will be started.*/
-  mii_write(&ETHD1, MII_BMCR, mii_read(&ETHD1, MII_BMCR) | BMCR_PDOWN);
+  for (uint8_t i = 0; i < 32; i++) {
+    if (ETHD1.phyaddrmask & (1 << i)) {
+      mii_write(&ETHD1, i, MII_BMCR, mii_read(&ETHD1, i, MII_BMCR) | BMCR_PDOWN);
+    }
+  }
 #endif
 
   /* MAC clocks stopped again.*/
@@ -386,7 +394,11 @@ void mac_lld_start(MACDriver *macp) {
 
 #if STM32_MAC_ETH1_CHANGE_PHY_STATE
   /* PHY in power up mode.*/
-  mii_write(macp, MII_BMCR, mii_read(macp, MII_BMCR) & ~BMCR_PDOWN);
+  for (uint8_t i = 0; i < 32; i++) {
+    if (macp->phyaddrmask & (1 << i)) {
+      mii_write(macp, i, MII_BMCR, mii_read(macp, i, MII_BMCR) & ~BMCR_PDOWN);
+    }
+  }
 #endif
 
   ETH->DMAMR |= ETH_DMAMR_SWR;
@@ -460,8 +472,12 @@ void mac_lld_stop(MACDriver *macp) {
 
   if (macp->state != MAC_STOP) {
 #if STM32_MAC_ETH1_CHANGE_PHY_STATE
-    /* PHY in power down mode until the driver will be restarted.*/
-    mii_write(macp, MII_BMCR, mii_read(macp, MII_BMCR) | BMCR_PDOWN);
+  /* PHY in power down mode until the driver will be restarted.*/
+  for (uint8_t i = 0; i < 32; i++) {
+    if (macp->phyaddrmask & (1 << i)) {
+      mii_write(macp, i, MII_BMCR, mii_read(macp, i, MII_BMCR) | BMCR_PDOWN);
+    }
+  }
 #endif
 
     /* MAC and DMA stopped.*/
@@ -656,58 +672,64 @@ bool mac_lld_poll_link_status(MACDriver *macp) {
 
   maccr = ETH->MACCR;
 
-  /* PHY CR and SR registers read.*/
-  (void)mii_read(macp, MII_BMSR);
-  bmsr = mii_read(macp, MII_BMSR);
-  bmcr = mii_read(macp, MII_BMCR);
+  for (uint8_t phyaddr = 0; phyaddr < 32; phyaddr++) {
+    if (!(macp->phyaddrmask & (1 << phyaddr))) {
+      continue;
+    }
+    /* PHY CR and SR registers read.*/
+    (void)mii_read(macp, phyaddr, MII_BMSR);
+    bmsr = mii_read(macp, phyaddr, MII_BMSR);
+    bmcr = mii_read(macp, phyaddr, MII_BMCR);
 
-  /* Check on auto-negotiation mode.*/
-  if (bmcr & BMCR_ANENABLE) {
-    uint32_t lpa;
+    /* Check on auto-negotiation mode.*/
+    if (bmcr & BMCR_ANENABLE) {
+      uint32_t lpa;
 
-    /* Auto-negotiation must be finished without faults and link established.*/
-    if ((bmsr & (BMSR_LSTATUS | BMSR_RFAULT | BMSR_ANEGCOMPLETE)) !=
-        (BMSR_LSTATUS | BMSR_ANEGCOMPLETE))
-      return macp->link_up = false;
+      /* Auto-negotiation must be finished without faults and link established.*/
+      if ((bmsr & (BMSR_LSTATUS | BMSR_RFAULT | BMSR_ANEGCOMPLETE)) !=
+          (BMSR_LSTATUS | BMSR_ANEGCOMPLETE))
+        continue;
 
-    /* Auto-negotiation enabled, checks the LPA register.*/
-    lpa = mii_read(macp, MII_LPA);
+      /* Auto-negotiation enabled, checks the LPA register.*/
+      lpa = mii_read(macp, phyaddr, MII_LPA);
 
-    /* Check on link speed.*/
-    if (lpa & (LPA_100HALF | LPA_100FULL | LPA_100BASE4))
-      maccr |= ETH_MACCR_FES;
-    else
-      maccr &= ~ETH_MACCR_FES;
+      /* Check on link speed.*/
+      if (lpa & (LPA_100HALF | LPA_100FULL | LPA_100BASE4))
+        maccr |= ETH_MACCR_FES;
+      else
+        maccr &= ~ETH_MACCR_FES;
 
-    /* Check on link mode.*/
-    if (lpa & (LPA_10FULL | LPA_100FULL))
-      maccr |= ETH_MACCR_DM;
-    else
-      maccr &= ~ETH_MACCR_DM;
+      /* Check on link mode.*/
+      if (lpa & (LPA_10FULL | LPA_100FULL))
+        maccr |= ETH_MACCR_DM;
+      else
+        maccr &= ~ETH_MACCR_DM;
+    }
+    else {
+      /* Link must be established.*/
+      if (!(bmsr & BMSR_LSTATUS))
+        continue;
+
+      /* Check on link speed.*/
+      if (bmcr & BMCR_SPEED100)
+        maccr |= ETH_MACCR_FES;
+      else
+        maccr &= ~ETH_MACCR_FES;
+
+      /* Check on link mode.*/
+      if (bmcr & BMCR_FULLDPLX)
+        maccr |= ETH_MACCR_DM;
+      else
+        maccr &= ~ETH_MACCR_DM;
+    }
+
+    /* Changes the mode in the MAC.*/
+    ETH->MACCR = maccr;
+
+    /* Returns the link status.*/
+    return macp->link_up = true;
   }
-  else {
-    /* Link must be established.*/
-    if (!(bmsr & BMSR_LSTATUS))
-      return macp->link_up = false;
-
-    /* Check on link speed.*/
-    if (bmcr & BMCR_SPEED100)
-      maccr |= ETH_MACCR_FES;
-    else
-      maccr &= ~ETH_MACCR_FES;
-
-    /* Check on link mode.*/
-    if (bmcr & BMCR_FULLDPLX)
-      maccr |= ETH_MACCR_DM;
-    else
-      maccr &= ~ETH_MACCR_DM;
-  }
-
-  /* Changes the mode in the MAC.*/
-  ETH->MACCR = maccr;
-
-  /* Returns the link status.*/
-  return macp->link_up = true;
+  return macp->link_up = false;
 }
 
 /**
