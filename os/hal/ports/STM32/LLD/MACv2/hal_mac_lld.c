@@ -189,6 +189,10 @@ static void mii_find_phy(MACDriver *macp) {
  do {
 #endif
     for (i = 0U; i <= 31U; i++) {
+#if BOARD_PHY_ID == MII_KSZ9896C_ID
+      // Note, if this is not detected then it will loop forever
+      i = 5;
+#endif
       macp->phyaddr = i << ETH_MACMDIOAR_PA_Pos;
       ETH->MACMDIOAR = (i << ETH_MACMDIOAR_RDA_Pos) | MACMDIODR_CR;
       ETH->MACMDIODR = (i << ETH_MACMDIODR_RA_Pos) | MACMDIODR_CR;

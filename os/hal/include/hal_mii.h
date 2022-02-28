@@ -170,6 +170,7 @@
 #define MII_LAN8720_ID          0x0007C0F0
 #define MII_LAN8742A_ID         0x0007C130
 #define MII_LAN8740A_ID         0x0007C110
+#define MII_KSZ9896C_ID         0x00221631
 /** @} */
 
 #endif /* MII_H */
