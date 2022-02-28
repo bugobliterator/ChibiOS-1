@@ -172,7 +172,7 @@ uint32_t mii_read(MACDriver *macp, uint32_t reg) {
                   ETH_MACMDIOAR_MOC_RD | ETH_MACMDIOAR_MB;
   while ((ETH->MACMDIOAR & ETH_MACMDIOAR_MB) != 0)
     ;
-  return ETH->MACMDIODR;
+  return ETH->MACMDIODR & 0x0000FFFFUL;
 }
 
 #if !defined(BOARD_PHY_ADDRESS)
@@ -329,7 +329,7 @@ void mac_lld_init(void) {
 
   /* PHY address setup.*/
 #if defined(BOARD_PHY_ADDRESS)
-  ETHD1.phyaddr = BOARD_PHY_ADDRESS << 11;
+  ETHD1.phyaddr = BOARD_PHY_ADDRESS << ETH_MACMDIOAR_PA_Pos;
 #else
   mii_find_phy(&ETHD1);
 #endif
