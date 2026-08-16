@@ -258,9 +258,13 @@ typedef struct {
    */
   BaseBlockDevice               *blkdev;
   /**
-   * @brief   Pointer to data buffer for single block.
+   * @brief   Pointer to block data buffer.
    */
   uint8_t                       *blkbuf;
+  /**
+   * @brief   Size of the block data buffer in bytes.
+   */
+  size_t                        blkbuf_size;
   /**
    * @brief   Pointer to SCSI inquiry response object.
    */

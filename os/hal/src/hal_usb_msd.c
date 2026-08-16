@@ -193,10 +193,6 @@ static uint32_t scsi_transport_transmit_async(const SCSITransport *transport,
   osalSysLock();
   osalThreadResumeS(&trp->txworker, MSG_OK);
   osalSysUnlock();
-  // if (trp->txlen > 0) {
-  //   usbTransmit(trp->usbp, trp->ep, trp->txbuf,
-  //             trp->txlen);
-  // }
 
   return len;
 }
@@ -416,13 +412,14 @@ void msdStop(USBMassStorageDriver *msdp) {
  * @param[in] blkdev    pointer to the @p BaseBlockDevice object
  * @param[in] blkbuf    pointer to the working area buffer, must be allocated
  *                      by user, must be big enough to store 1 data block
+ * @param[in] blkbuf_size size of the working area buffer in bytes
  * @param[in] inquiry   pointer to the SCSI inquiry response structure,
  *                      set it to @p NULL to use default hardcoded value.
  *
  * @api
  */
 void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
-              BaseBlockDevice *blkdev, uint8_t *blkbuf,
+              BaseBlockDevice *blkdev, uint8_t *blkbuf, size_t blkbuf_size,
               uint8_t *txbuf,
               const scsi_inquiry_response_t *inquiry,
               const scsi_unit_serial_number_inquiry_response_t *serialInquiry,
@@ -430,7 +427,7 @@ void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
               scsi_free_filesystem_access_t freeFilesystemAccess) {
 
   osalDbgCheck((msdp != NULL) && (usbp != NULL)
-              && (blkdev != NULL) && (blkbuf != NULL));
+              && (blkdev != NULL) && (blkbuf != NULL) && (blkbuf_size > 0U));
   osalDbgAssert((msdp->state == USB_MSD_STOP), "invalid state");
 
   msdp->usbp = usbp;
@@ -463,6 +460,7 @@ void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
     msdp->scsi_config.unit_serial_number_inquiry_response = serialInquiry;
   }
   msdp->scsi_config.blkbuf = blkbuf;
+  msdp->scsi_config.blkbuf_size = blkbuf_size;
   msdp->scsi_config.blkdev = blkdev;
   msdp->scsi_config.transport = &msdp->scsi_transport;
 

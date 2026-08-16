@@ -352,6 +352,7 @@ static bool data_overflow(SCSITarget *scsip, const data_request_t *req) {
 static bool data_read_write10(SCSITarget *scsip, const uint8_t *cmd) {
 
   data_request_t req = decode_data_request(cmd);
+  scsip->residue = 0;
 
   if (data_overflow(scsip, &req)) {
     return SCSI_FAILED;
@@ -363,19 +364,65 @@ static bool data_read_write10(SCSITarget *scsip, const uint8_t *cmd) {
     blkGetInfo(blkdev, &bdi);
     size_t bs = bdi.blk_size;
     uint8_t *buf = scsip->config->blkbuf;
+    size_t max_blocks = bs > 0U ? scsip->config->blkbuf_size / bs : 0U;
+
+    if (max_blocks == 0U) {
+      set_sense(scsip, SCSI_SENSE_KEY_HARDWARE_ERROR,
+                       SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                       SCSI_ASENSEQ_NO_QUALIFIER);
+      scsip->residue = req.blk_cnt * bs;
+      return SCSI_FAILED;
+    }
 
     size_t i = 0;
-    for (i=0; i<req.blk_cnt; i++) {
+    while (i < req.blk_cnt) {
+      size_t n = req.blk_cnt - i;
+      if (n > max_blocks) {
+        n = max_blocks;
+      }
+      size_t len = n * bs;
+
       if (cmd[0] == SCSI_CMD_READ_10) {
-        // TODO: block error handling
-        blkRead(blkdev, req.first_lba + i, buf, 1);
-        tr->transmit_async(tr, buf, bs);
+        if (blkRead(blkdev, req.first_lba + i, buf, n) != HAL_SUCCESS) {
+          set_sense(scsip, SCSI_SENSE_KEY_MEDIUM_ERROR,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = (req.blk_cnt - i) * bs;
+          return SCSI_FAILED;
+        }
+        uint32_t sent = tr->transmit(tr, buf, len);
+        if (sent != len) {
+          set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = (req.blk_cnt - i) * bs;
+          if (sent < len) {
+            scsip->residue -= sent;
+          }
+          return SCSI_FAILED;
+        }
       }
       else {
-        // TODO: block error handling
-        tr->receive(tr, buf, bs);
-        blkWrite(blkdev, req.first_lba + i, buf, 1);
+        uint32_t received = tr->receive(tr, buf, len);
+        if (received != len) {
+          set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = (req.blk_cnt - i) * bs;
+          if (received < len) {
+            scsip->residue -= received;
+          }
+          return SCSI_FAILED;
+        }
+        if (blkWrite(blkdev, req.first_lba + i, buf, n) != HAL_SUCCESS) {
+          set_sense(scsip, SCSI_SENSE_KEY_MEDIUM_ERROR,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = (req.blk_cnt - i - n) * bs;
+          return SCSI_FAILED;
+        }
       }
+      i += n;
     }
   }
   return SCSI_SUCCESS;

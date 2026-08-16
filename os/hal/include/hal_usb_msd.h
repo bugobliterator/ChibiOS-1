@@ -214,7 +214,7 @@ extern "C" {
 #endif
   void msdObjectInit(USBMassStorageDriver *msdp);
   void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
-                BaseBlockDevice *blkdev, uint8_t *blkbuf,
+                BaseBlockDevice *blkdev, uint8_t *blkbuf, size_t blkbuf_size,
                 uint8_t *txbuf,
                 const scsi_inquiry_response_t *scsi_inquiry_response,
                 const scsi_unit_serial_number_inquiry_response_t *serialInquiry,
