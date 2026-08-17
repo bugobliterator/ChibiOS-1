@@ -199,6 +199,34 @@ typedef uint32_t (*scsi_transport_receive_t)(const SCSITransport *transport,
                                              uint8_t *data, size_t len);
 
 /**
+ * @brief   Type of an asynchronous SCSI transport transmit start call.
+ *
+ * @param[in] usbp      pointer to the @p SCSITransport object
+ * @param[in] data      pointer to payload buffer
+ * @param[in] len       payload length
+ */
+typedef uint32_t (*scsi_transport_transmit_start_t)(const SCSITransport *transport,
+                                                    const uint8_t *data,
+                                                    size_t len);
+
+/**
+ * @brief   Type of an asynchronous SCSI transport receive start call.
+ *
+ * @param[in] usbp      pointer to the @p SCSITransport object
+ * @param[out] data     pointer to receive buffer
+ * @param[in] len       number of bytes to be received
+ */
+typedef uint32_t (*scsi_transport_receive_start_t)(const SCSITransport *transport,
+                                                   uint8_t *data, size_t len);
+
+/**
+ * @brief   Type of an asynchronous SCSI transport completion call.
+ *
+ * @param[in] usbp      pointer to the @p SCSITransport object
+ */
+typedef uint32_t (*scsi_transport_wait_t)(const SCSITransport *transport);
+
+/**
  * @brief Type of block filesystem call.
  * 
  */
@@ -220,14 +248,24 @@ struct SCSITransport {
   scsi_transport_transmit_t     transmit;
 
   /**
-   * @brief   Transmit asynchronous
-   */
-  scsi_transport_transmit_t   transmit_async;
-
-  /**
    * @brief   Receive call provided by lower level driver.
    */
   scsi_transport_receive_t      receive;
+
+  /**
+   * @brief   Start an asynchronous transmit operation.
+   */
+  scsi_transport_transmit_start_t transmit_start;
+
+  /**
+   * @brief   Start an asynchronous receive operation.
+   */
+  scsi_transport_receive_start_t receive_start;
+
+  /**
+   * @brief   Wait for an asynchronous transport operation.
+   */
+  scsi_transport_wait_t         wait;
 
   /**
    * @brief   Block Filesystem access.
@@ -260,7 +298,7 @@ typedef struct {
   /**
    * @brief   Pointer to block data buffer.
    */
-  uint8_t                       *blkbuf;
+  uint8_t                       *blkbuf[2];
   /**
    * @brief   Size of the block data buffer in bytes.
    */

@@ -123,24 +123,49 @@ typedef struct {
 
 
   /**
-   * @brief   Tx Thread working area.
+   * @brief   Asynchronous I/O thread working area.
    */
-  THD_WORKING_AREA(             waMSDTxWorker, USB_MSD_THREAD_WA_SIZE);
+  THD_WORKING_AREA(             waMSDIOWorker, USB_MSD_THREAD_WA_SIZE);
 
   /**
-   * @brief   Tx Thread handler.
+   * @brief   Asynchronous I/O thread handler.
    */
-  thread_reference_t            txworker;
+  thread_t                      *ioworker;
 
   /**
-   * @brief   USB Transmit Buffer
+   * @brief   Signals an asynchronous I/O request.
    */
-  uint8_t *txbuf;
+  binary_semaphore_t            io_start;
 
   /**
-   * @brief   USB Transmit Length
+   * @brief   Signals asynchronous I/O completion.
    */
-  size_t txlen;
+  binary_semaphore_t            io_done;
+
+  /**
+   * @brief   Asynchronous I/O buffer.
+   */
+  uint8_t                       *iobuf;
+
+  /**
+   * @brief   Asynchronous I/O length.
+   */
+  size_t                        iolen;
+
+  /**
+   * @brief   Result of the asynchronous I/O operation.
+   */
+  uint32_t                      io_result;
+
+  /**
+   * @brief   True when the asynchronous operation is a transmit.
+   */
+  bool                          io_is_transmit;
+
+  /**
+   * @brief   True while an asynchronous operation is pending.
+   */
+  bool                          io_pending;
 
   /**
    * @brief   USB Transmit mutex
@@ -214,8 +239,8 @@ extern "C" {
 #endif
   void msdObjectInit(USBMassStorageDriver *msdp);
   void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
-                BaseBlockDevice *blkdev, uint8_t *blkbuf, size_t blkbuf_size,
-                uint8_t *txbuf,
+                BaseBlockDevice *blkdev, uint8_t *blkbuf_a, uint8_t *blkbuf_b,
+                size_t blkbuf_size,
                 const scsi_inquiry_response_t *scsi_inquiry_response,
                 const scsi_unit_serial_number_inquiry_response_t *serialInquiry,
                 scsi_block_filesystem_access_t blockFilesystemAccess,

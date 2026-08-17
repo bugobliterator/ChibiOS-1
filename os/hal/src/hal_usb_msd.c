@@ -172,32 +172,6 @@ static uint32_t scsi_transport_transmit(const SCSITransport *transport,
 }
 
 /**
- * @brief SCSI transport transmit async function.
- * 
- * @param[in] transport pointer to the @p SCSITransport object
- * @param[in] data      payload
- * @param[in] len       number of bytes to be transmitted
- * 
- * @return              Number of bytes put into buffer.
- * @notapi
- */
-static uint32_t scsi_transport_transmit_async(const SCSITransport *transport,
-                                        const uint8_t *data, size_t len) {
-
-  usb_scsi_transport_handler_t *trp = transport->handler;
-  // wait for previous tx to finish, if unfinished
-  osalMutexLock(&trp->txmtx);
-  memcpy(trp->txbuf, data, len);
-  trp->txlen = len;
-  osalMutexUnlock(&trp->txmtx);
-  osalSysLock();
-  osalThreadResumeS(&trp->txworker, MSG_OK);
-  osalSysUnlock();
-
-  return len;
-}
-
-/**
  * @brief   SCSI transport receive function.
  *
  * @param[in] transport pointer to the @p SCSITransport object
@@ -218,6 +192,88 @@ static uint32_t scsi_transport_receive(const SCSITransport *transport,
     return status;
   else
     return 0;
+}
+
+/**
+ * @brief   Starts an asynchronous SCSI transport operation.
+ *
+ * @param[in] transport pointer to the @p SCSITransport object
+ * @param[in] data      payload buffer
+ * @param[in] len       number of bytes to transfer
+ * @param[in] transmit  true for transmit, false for receive
+ *
+ * @return              Number of bytes accepted for transfer.
+ * @notapi
+ */
+static uint32_t scsi_transport_start(const SCSITransport *transport,
+                                     uint8_t *data, size_t len,
+                                     bool transmit) {
+
+  usb_scsi_transport_handler_t *trp = transport->handler;
+  if (trp->io_pending) {
+    return 0;
+  }
+
+  trp->iobuf = data;
+  trp->iolen = len;
+  trp->io_is_transmit = transmit;
+  trp->io_pending = true;
+  chBSemSignal(&trp->io_start);
+
+  return len;
+}
+
+/**
+ * @brief   Starts an asynchronous SCSI transport transmit.
+ *
+ * @param[in] transport pointer to the @p SCSITransport object
+ * @param[in] data      payload
+ * @param[in] len       number of bytes to transmit
+ *
+ * @return              Number of bytes accepted for transfer.
+ * @notapi
+ */
+static uint32_t scsi_transport_transmit_start(const SCSITransport *transport,
+                                              const uint8_t *data,
+                                              size_t len) {
+
+  return scsi_transport_start(transport, (uint8_t *)data, len, true);
+}
+
+/**
+ * @brief   Starts an asynchronous SCSI transport receive.
+ *
+ * @param[in] transport pointer to the @p SCSITransport object
+ * @param[out] data     payload buffer
+ * @param[in] len       number of bytes to receive
+ *
+ * @return              Number of bytes accepted for transfer.
+ * @notapi
+ */
+static uint32_t scsi_transport_receive_start(const SCSITransport *transport,
+                                             uint8_t *data, size_t len) {
+
+  return scsi_transport_start(transport, data, len, false);
+}
+
+/**
+ * @brief   Waits for an asynchronous SCSI transport operation.
+ *
+ * @param[in] transport pointer to the @p SCSITransport object
+ *
+ * @return              Number of bytes transferred.
+ * @notapi
+ */
+static uint32_t scsi_transport_wait(const SCSITransport *transport) {
+
+  usb_scsi_transport_handler_t *trp = transport->handler;
+  if (!trp->io_pending) {
+    return 0;
+  }
+
+  chBSemWait(&trp->io_done);
+  trp->io_pending = false;
+  return trp->io_result;
 }
 
 /**
@@ -285,29 +341,36 @@ static THD_FUNCTION(usb_msd_worker, arg) {
 }
 
 /**
- * @brief USB Transmit worker thread.
+ * @brief USB asynchronous I/O worker thread.
  * 
  * @param[in] arg     pointer to the @p USBMassStorageDriver object
  * 
  * @notapi
  */
-static THD_FUNCTION(usb_msd_tx_worker, arg) {
+static THD_FUNCTION(usb_msd_io_worker, arg) {
   USBMassStorageDriver *msdp = arg;
-  chRegSetThreadName("usb_msd_tx_worker");
-  
+  usb_scsi_transport_handler_t *trp = &msdp->usb_scsi_transport_handler;
+  chRegSetThreadName("usb_msd_io_worker");
+
   while(! chThdShouldTerminateX()) {
-    osalSysLock();
-    osalThreadSuspendS(&msdp->usb_scsi_transport_handler.txworker);
-    osalSysUnlock();
-    osalMutexLock(&msdp->usb_scsi_transport_handler.txmtx);
-    if (msdp->usb_scsi_transport_handler.txlen > 0) {
-      usbTransmit(msdp->usbp, USB_MSD_DATA_EP, msdp->usb_scsi_transport_handler.txbuf,
-                  msdp->usb_scsi_transport_handler.txlen);
-      msdp->usb_scsi_transport_handler.txlen = 0;
+    chBSemWait(&trp->io_start);
+    if (chThdShouldTerminateX()) {
+      break;
     }
-    osalMutexUnlock(&msdp->usb_scsi_transport_handler.txmtx);
+
+    osalMutexLock(&trp->txmtx);
+    if (trp->io_is_transmit) {
+      msg_t status = usbTransmit(trp->usbp, trp->ep, trp->iobuf, trp->iolen);
+      trp->io_result = status == MSG_OK ? trp->iolen : 0;
+    }
+    else {
+      msg_t status = usbReceive(trp->usbp, trp->ep, trp->iobuf, trp->iolen);
+      trp->io_result = status == MSG_RESET ? 0 : status;
+    }
+    osalMutexUnlock(&trp->txmtx);
+    chBSemSignal(&trp->io_done);
   }
-  
+
   chThdExit(MSG_OK);
 }
 
@@ -368,7 +431,7 @@ void msdObjectInit(USBMassStorageDriver *msdp) {
   msdp->state = USB_MSD_STOP;
   msdp->usbp = NULL;
   msdp->worker = NULL;
-  msdp->usb_scsi_transport_handler.txworker = NULL;
+  msdp->usb_scsi_transport_handler.ioworker = NULL;
 
   scsiObjectInit(&msdp->scsi_target);
 }
@@ -388,18 +451,14 @@ void msdStop(USBMassStorageDriver *msdp) {
   chThdTerminate(msdp->worker);
   chThdWait(msdp->worker);
 
-  chThdTerminate(msdp->usb_scsi_transport_handler.txworker);
-  osalSysLock();
-  thread_t* tp = msdp->usb_scsi_transport_handler.txworker;
-  // resume thread so it can terminate
-  osalThreadResumeS(&tp, MSG_OK);
-  osalSysUnlock();
-  chThdWait(msdp->usb_scsi_transport_handler.txworker);
+  chThdTerminate(msdp->usb_scsi_transport_handler.ioworker);
+  chBSemSignal(&msdp->usb_scsi_transport_handler.io_start);
+  chThdWait(msdp->usb_scsi_transport_handler.ioworker);
 
   scsiStop(&msdp->scsi_target);
 
   msdp->worker = NULL;
-  msdp->usb_scsi_transport_handler.txworker = NULL;
+  msdp->usb_scsi_transport_handler.ioworker = NULL;
   msdp->state = USB_MSD_STOP;
   msdp->usbp = NULL;
 }
@@ -410,8 +469,8 @@ void msdStop(USBMassStorageDriver *msdp) {
  * @param[in] msdp      pointer to the @p USBMassStorageDriver object
  * @param[in] usbp      pointer to the @p USBDriver object
  * @param[in] blkdev    pointer to the @p BaseBlockDevice object
- * @param[in] blkbuf    pointer to the working area buffer, must be allocated
- *                      by user, must be big enough to store 1 data block
+ * @param[in] blkbuf_a  pointer to the first working area buffer
+ * @param[in] blkbuf_b  pointer to the second working area buffer
  * @param[in] blkbuf_size size of the working area buffer in bytes
  * @param[in] inquiry   pointer to the SCSI inquiry response structure,
  *                      set it to @p NULL to use default hardcoded value.
@@ -419,30 +478,37 @@ void msdStop(USBMassStorageDriver *msdp) {
  * @api
  */
 void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
-              BaseBlockDevice *blkdev, uint8_t *blkbuf, size_t blkbuf_size,
-              uint8_t *txbuf,
+              BaseBlockDevice *blkdev, uint8_t *blkbuf_a, uint8_t *blkbuf_b,
+              size_t blkbuf_size,
               const scsi_inquiry_response_t *inquiry,
               const scsi_unit_serial_number_inquiry_response_t *serialInquiry,
               scsi_block_filesystem_access_t blockFilesystemAccess,
               scsi_free_filesystem_access_t freeFilesystemAccess) {
 
   osalDbgCheck((msdp != NULL) && (usbp != NULL)
-              && (blkdev != NULL) && (blkbuf != NULL) && (blkbuf_size > 0U));
+              && (blkdev != NULL) && (blkbuf_a != NULL) && (blkbuf_b != NULL)
+              && (blkbuf_size > 0U));
   osalDbgAssert((msdp->state == USB_MSD_STOP), "invalid state");
 
   msdp->usbp = usbp;
 
   msdp->usb_scsi_transport_handler.usbp = msdp->usbp;
   msdp->usb_scsi_transport_handler.ep   = USB_MSD_DATA_EP;
-  msdp->usb_scsi_transport_handler.txbuf = txbuf;
   osalMutexObjectInit(&msdp->usb_scsi_transport_handler.txmtx);
-  msdp->usb_scsi_transport_handler.txworker = chThdCreateStatic(msdp->usb_scsi_transport_handler.waMSDTxWorker, sizeof(msdp->usb_scsi_transport_handler.waMSDTxWorker),
-                                      MSD_THD_PRIO, usb_msd_tx_worker, msdp);
+  chBSemObjectInit(&msdp->usb_scsi_transport_handler.io_start, true);
+  chBSemObjectInit(&msdp->usb_scsi_transport_handler.io_done, true);
+  msdp->usb_scsi_transport_handler.io_pending = false;
+  msdp->usb_scsi_transport_handler.ioworker = chThdCreateStatic(
+      msdp->usb_scsi_transport_handler.waMSDIOWorker,
+      sizeof(msdp->usb_scsi_transport_handler.waMSDIOWorker), MSD_THD_PRIO,
+      usb_msd_io_worker, msdp);
 
   msdp->scsi_transport.handler  = &msdp->usb_scsi_transport_handler;
   msdp->scsi_transport.transmit = scsi_transport_transmit;
-  msdp->scsi_transport.transmit_async = scsi_transport_transmit_async;
   msdp->scsi_transport.receive  = scsi_transport_receive;
+  msdp->scsi_transport.transmit_start = scsi_transport_transmit_start;
+  msdp->scsi_transport.receive_start = scsi_transport_receive_start;
+  msdp->scsi_transport.wait = scsi_transport_wait;
 
   msdp->scsi_transport.block_filesystem_access = blockFilesystemAccess;
   msdp->scsi_transport.free_filesystem_access = freeFilesystemAccess;
@@ -459,7 +525,8 @@ void msdStart(USBMassStorageDriver *msdp, USBDriver *usbp,
   else {
     msdp->scsi_config.unit_serial_number_inquiry_response = serialInquiry;
   }
-  msdp->scsi_config.blkbuf = blkbuf;
+  msdp->scsi_config.blkbuf[0] = blkbuf_a;
+  msdp->scsi_config.blkbuf[1] = blkbuf_b;
   msdp->scsi_config.blkbuf_size = blkbuf_size;
   msdp->scsi_config.blkdev = blkdev;
   msdp->scsi_config.transport = &msdp->scsi_transport;

@@ -363,66 +363,148 @@ static bool data_read_write10(SCSITarget *scsip, const uint8_t *cmd) {
     BlockDeviceInfo bdi;
     blkGetInfo(blkdev, &bdi);
     size_t bs = bdi.blk_size;
-    uint8_t *buf = scsip->config->blkbuf;
     size_t max_blocks = bs > 0U ? scsip->config->blkbuf_size / bs : 0U;
+    uint32_t total_len = req.blk_cnt * bs;
 
     if (max_blocks == 0U) {
       set_sense(scsip, SCSI_SENSE_KEY_HARDWARE_ERROR,
                        SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
                        SCSI_ASENSEQ_NO_QUALIFIER);
-      scsip->residue = req.blk_cnt * bs;
+      scsip->residue = total_len;
       return SCSI_FAILED;
     }
 
-    size_t i = 0;
-    while (i < req.blk_cnt) {
-      size_t n = req.blk_cnt - i;
-      if (n > max_blocks) {
-        n = max_blocks;
-      }
-      size_t len = n * bs;
+    if (cmd[0] == SCSI_CMD_READ_10) {
+      size_t i = 0;
+      size_t pending_len = 0;
+      unsigned buf_idx = 0;
+      uint32_t transferred = 0;
 
-      if (cmd[0] == SCSI_CMD_READ_10) {
+      while (i < req.blk_cnt) {
+        size_t n = req.blk_cnt - i;
+        if (n > max_blocks) {
+          n = max_blocks;
+        }
+        size_t len = n * bs;
+        uint8_t *buf = scsip->config->blkbuf[buf_idx];
+
         if (blkRead(blkdev, req.first_lba + i, buf, n) != HAL_SUCCESS) {
+          if (pending_len > 0U) {
+            uint32_t sent = tr->wait(tr);
+            transferred += sent < pending_len ? sent : pending_len;
+          }
           set_sense(scsip, SCSI_SENSE_KEY_MEDIUM_ERROR,
                            SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
                            SCSI_ASENSEQ_NO_QUALIFIER);
-          scsip->residue = (req.blk_cnt - i) * bs;
+          scsip->residue = total_len - transferred;
           return SCSI_FAILED;
         }
-        uint32_t sent = tr->transmit(tr, buf, len);
-        if (sent != len) {
+
+        if (pending_len > 0U) {
+          uint32_t sent = tr->wait(tr);
+          transferred += sent < pending_len ? sent : pending_len;
+          if (sent != pending_len) {
+            set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                             SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                             SCSI_ASENSEQ_NO_QUALIFIER);
+            scsip->residue = total_len - transferred;
+            return SCSI_FAILED;
+          }
+        }
+
+        if (tr->transmit_start(tr, buf, len) != len) {
           set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
                            SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
                            SCSI_ASENSEQ_NO_QUALIFIER);
-          scsip->residue = (req.blk_cnt - i) * bs;
-          if (sent < len) {
-            scsip->residue -= sent;
-          }
+          scsip->residue = total_len - transferred;
+          return SCSI_FAILED;
+        }
+        pending_len = len;
+        i += n;
+        buf_idx ^= 1U;
+      }
+
+      if (pending_len > 0U) {
+        uint32_t sent = tr->wait(tr);
+        transferred += sent < pending_len ? sent : pending_len;
+        if (sent != pending_len) {
+          set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = total_len - transferred;
           return SCSI_FAILED;
         }
       }
-      else {
-        uint32_t received = tr->receive(tr, buf, len);
-        if (received != len) {
+    }
+    else if (req.blk_cnt > 0U) {
+      size_t i = 0;
+      size_t n = req.blk_cnt > max_blocks ? max_blocks : req.blk_cnt;
+      size_t pending_len = n * bs;
+      unsigned buf_idx = 0;
+      uint32_t transferred = 0;
+
+      if (tr->receive_start(tr, scsip->config->blkbuf[buf_idx],
+                            pending_len) != pending_len) {
+        set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                         SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                         SCSI_ASENSEQ_NO_QUALIFIER);
+        scsip->residue = total_len;
+        return SCSI_FAILED;
+      }
+
+      while (i < req.blk_cnt) {
+        uint32_t received = tr->wait(tr);
+        transferred += received < pending_len ? received : pending_len;
+        if (received != pending_len) {
           set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
                            SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
                            SCSI_ASENSEQ_NO_QUALIFIER);
-          scsip->residue = (req.blk_cnt - i) * bs;
-          if (received < len) {
-            scsip->residue -= received;
-          }
+          scsip->residue = total_len - transferred;
           return SCSI_FAILED;
         }
-        if (blkWrite(blkdev, req.first_lba + i, buf, n) != HAL_SUCCESS) {
+
+        size_t next_i = i + n;
+        bool next_pending = false;
+        size_t next_n = 0;
+        size_t next_len = 0;
+        if (next_i < req.blk_cnt) {
+          next_n = req.blk_cnt - next_i;
+          if (next_n > max_blocks) {
+            next_n = max_blocks;
+          }
+          next_len = next_n * bs;
+          if (tr->receive_start(tr, scsip->config->blkbuf[buf_idx ^ 1U],
+                                next_len) == next_len) {
+            next_pending = true;
+          }
+        }
+
+        if (blkWrite(blkdev, req.first_lba + i,
+                     scsip->config->blkbuf[buf_idx], n) != HAL_SUCCESS) {
+          if (next_pending) {
+            received = tr->wait(tr);
+            transferred += received < next_len ? received : next_len;
+          }
           set_sense(scsip, SCSI_SENSE_KEY_MEDIUM_ERROR,
                            SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
                            SCSI_ASENSEQ_NO_QUALIFIER);
-          scsip->residue = (req.blk_cnt - i - n) * bs;
+          scsip->residue = total_len - transferred;
           return SCSI_FAILED;
         }
+
+        if (next_i < req.blk_cnt && !next_pending) {
+          set_sense(scsip, SCSI_SENSE_KEY_ABORTED_COMMAND,
+                           SCSI_ASENSE_NO_ADDITIONAL_INFORMATION,
+                           SCSI_ASENSEQ_NO_QUALIFIER);
+          scsip->residue = total_len - transferred;
+          return SCSI_FAILED;
+        }
+
+        i = next_i;
+        n = next_n;
+        pending_len = next_len;
+        buf_idx ^= 1U;
       }
-      i += n;
     }
   }
   return SCSI_SUCCESS;
